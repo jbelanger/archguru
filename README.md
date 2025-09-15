@@ -1,4 +1,4 @@
-# ArchGuru 🏛️
+# ArchGuru 🏛️
 
 > **Universal AI Architecture Decision Platform** - Get the best architectural guidance from competing AI models
 
@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/Python-3.13+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-**⚠️ This project is currently under active development. The features described below represent the final vision - most are not yet implemented.**
+**⚠️ This project is currently under active development. The features described below represent the final vision - most are not yet implemented.**
 
 ## What is ArchGuru?
 
