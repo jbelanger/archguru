@@ -8,9 +8,9 @@ Building a **Universal AI Architecture Decision Platform** that uses multiple AI
 
 A CLI platform (`archguru`) where AI model teams compete:
 
-1. **OpenAI Team** - GPT models running research→community→generation pipeline
-2. **Claude Team** - Claude models running research→community→generation pipeline
-3. **Llama Team** - Llama models running research→community→generation pipeline
+1. **Team A** - Configurable models (default: OpenAI) running research→community→generation pipeline
+2. **Team B** - Configurable models (default: Claude) running research→community→generation pipeline
+3. **Team C** - Configurable models (default: Llama) running research→community→generation pipeline
 4. **Cross-Model Debates** - Models analyze and critique each other's recommendations
 5. **Performance Analytics** - Track which models excel at which decision types
 
@@ -84,13 +84,35 @@ git tag v0.1  # After Chapter 1
 git tag v0.2  # After Chapter 2, etc.
 ```
 
+## Environment Configuration
+
+Configure models via environment variables in `.env`:
+
+```bash
+# Required
+OPENROUTER_API_KEY=your_key_here
+
+# Optional: Custom model teams (defaults to OpenAI, Claude, Llama)
+ARCHGURU_TEAM_A_MODELS=openai/gpt-4o,openai/gpt-4o-mini
+ARCHGURU_TEAM_B_MODELS=x-ai/grok-beta,anthropic/claude-3-haiku
+ARCHGURU_TEAM_C_MODELS=deepseek/deepseek-chat,meta-llama/llama-3.1-8b-instruct
+
+# Optional: Final arbiter model (default: openai/gpt-4o)
+ARCHGURU_ARBITER_MODEL=anthropic/claude-3.5-sonnet
+
+# Examples of other model combinations:
+# ARCHGURU_TEAM_A_MODELS=google/gemini-pro-1.5,google/gemini-flash-1.5
+# ARCHGURU_TEAM_B_MODELS=mistralai/mistral-large,mistralai/mistral-medium
+# ARCHGURU_TEAM_C_MODELS=qwen/qwen-2.5-72b-instruct,alibaba/qwen-turbo
+```
+
 ## File Structure
 
 ```
 archguru/
 ├── .python-version                    # Python 3.13
 ├── pyproject.toml                     # Project config with CLI entry point
-├── .env.example                       # OpenRouter API key template
+├── .env.example                       # OpenRouter API key and model configuration template
 ├── src/archguru/                      # THE REAL PRODUCT (iteratively built)
 │   ├── __init__.py
 │   ├── cli/
@@ -154,7 +176,7 @@ When resuming work:
 
 - **Python 3.13** with uv package manager
 - **LangGraph** for model team orchestration and cross-model debates
-- **OpenRouter** for multi-model access (GPT, Claude, Llama, etc.)
+- **OpenRouter** for multi-model access (configurable: GPT, Claude, Llama, Grok, DeepSeek, etc.)
 - **SQLite** for model response caching and performance tracking
 - **Rich/Typer** for production CLI interface
 - **FastAPI** for web dashboard and API endpoints
@@ -166,7 +188,7 @@ When resuming work:
 - **Real product development**: Every commit makes `archguru` CLI more powerful
 - **Version tagging**: Track progress with git tags (v0.1, v0.2, etc.)
 - **Production mindset**: Build something people will pay for, not just a tutorial
-- **Model competition focus**: Core value is comparing OpenRouter models
+- **Model competition focus**: Core value is comparing configurable OpenRouter models
 - **Iterative learning**: Learn LangGraph through real feature development
 
 ---

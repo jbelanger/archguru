@@ -26,13 +26,13 @@ Each model team runs the complete pipeline for any architectural decision:
    - **Community Phase**: Social sentiment analysis (Reddit, StackOverflow, Twitter, forums)
    - **Generation Phase**: Decision synthesis with pros/cons, trade-offs, and recommendations
 
-2. **Competing Model Teams** (same across all decision types):
-   - **OpenAI Team**: GPT-4o analyzing the architectural decision
-   - **Claude Team**: Claude-3.5-Sonnet analyzing the architectural decision
-   - **Llama Team**: Llama-3.1-70B analyzing the architectural decision
-   - *(Easily extensible to new OpenRouter models)*
+2. **Competing Model Teams** (configurable via environment variables):
+   - **Team A**: Configurable models (default: OpenAI GPT-4o series) analyzing the architectural decision
+   - **Team B**: Configurable models (default: Anthropic Claude series) analyzing the architectural decision
+   - **Team C**: Configurable models (default: Meta Llama series) analyzing the architectural decision
+   - *(Supports any OpenRouter models: Grok, DeepSeek, Gemini, Mistral, Qwen, etc.)*
 
-3. **Final Arbiter**: Configurable model makes final recommendation considering all team analyses and cross-model debate
+3. **Final Arbiter**: Environment-configurable model (via ARCHGURU_ARBITER_MODEL) makes final recommendation considering all team analyses and cross-model debate
 
 ### Decision Types (Extensible Plugin System)
 - **Project Structure**: File/folder organization, build systems, dependency management
@@ -50,8 +50,10 @@ Each model team runs the complete pipeline for any architectural decision:
 
 #### Model Selection Strategy
 - **OpenRouter API** as the unified interface for all model providers
-- **Multi-Model Competition**: 3+ models running identical workflows for comparison
-- **Cost-Performance Balance**: Mix of premium models (GPT-4o, Claude-3.5) and efficient models (GPT-4o-mini, Claude-3-Haiku)
+- **Environment-Configurable Teams**: Set custom model combinations via ARCHGURU_TEAM_A/B/C_MODELS environment variables
+- **Multi-Model Competition**: 3+ configurable teams running identical workflows for comparison
+- **Cost-Performance Balance**: Mix premium and efficient models based on user preference (GPT-4o vs GPT-4o-mini, Claude-3.5-Sonnet vs Claude-3-Haiku, etc.)
+- **Flexible Model Support**: Works with any OpenRouter models (Grok, DeepSeek, Gemini, Mistral, Qwen, etc.)
 - **Fallback Strategy**: Graceful degradation when models are unavailable
 - **Model Evaluation**: Track which models provide better architecture recommendations over time
 
@@ -76,9 +78,9 @@ graph TD
     A[User Input: Decision Type + Context] --> B[Check Cache]
     B --> C[Launch Model Teams in Parallel]
 
-    C --> D1[OpenAI Team: Universal Pipeline]
-    C --> D2[Claude Team: Universal Pipeline]
-    C --> D3[Llama Team: Universal Pipeline]
+    C --> D1[Team A: Universal Pipeline]
+    C --> D2[Team B: Universal Pipeline]
+    C --> D3[Team C: Universal Pipeline]
 
     D1 --> E1[Research → Community → Generate Decision]
     D2 --> E2[Research → Community → Generate Decision]
@@ -153,11 +155,12 @@ graph TD
 - **Coverage Breadth**: Successfully handle architectural decisions across all major technology domains
 
 ## Open Questions
-- Which models should be default competitors across all decision types? (Start with GPT-4o vs Claude-3.5 vs Llama-3.1?)
 - How to weight model expertise differently for different architectural domains?
 - Should we allow domain-specific model teams (e.g., different models for database vs deployment decisions)?
 - How to handle cross-domain architectural decisions that span multiple decision types?
 - Can we develop "model personality profiles" showing which models favor which architectural philosophies?
+- How to optimize default model combinations for best cost/performance balance?
+- Should we support dynamic model selection based on decision complexity?
 
 ## Future Expansion Possibilities
 - **Team Architecture Decisions**: Handle decisions requiring multiple stakeholder perspectives

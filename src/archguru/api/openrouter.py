@@ -95,8 +95,8 @@ Be concise but thorough. Focus on practical, production-ready advice."""
         # For MVP, just use one model from each team to keep it simple
         test_models = [
             ("openai/gpt-4o-mini", "openai"),
-            ("anthropic/claude-3-haiku", "claude"),
-            ("meta-llama/llama-3.2-3b-instruct", "llama")
+            ("x-ai/grok-code-fast-1", "claude"),
+            ("meta-llama/llama-3.2-3b-instruct:free", "llama")
         ]
 
         for model_name, team in test_models:
