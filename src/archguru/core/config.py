@@ -3,7 +3,7 @@ Configuration management for ArchGuru
 Handles OpenRouter API keys and model settings
 """
 import os
-from typing import List, Dict, Any
+from typing import List
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,38 +15,19 @@ class Config:
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-    # Model teams for competition (configurable via environment variables)
-    DEFAULT_MODEL_TEAMS = {
-        "team_a": [
-            "openai/gpt-oss-120b",
-            "openai/gpt-5-nano"
-        ],
-        "team_b": [
-            "qwen/qwen3-next-80b-a3b-thinking",
-            "qwen/qwen3-next-80b-a3b-instruct"
-        ],
-        "team_c": [
-            "openrouter/sonoma-dusk-alpha",
-            "openrouter/sonoma-sky-alpha"
-        ]
-    }
+    # Default competing models for simple-first approach
+    DEFAULT_MODELS = [
+        "openai/gpt-4o-mini",
+        "anthropic/claude-3-haiku"
+    ]
 
     @classmethod
-    def get_model_teams(cls) -> Dict[str, List[str]]:
-        """Get model teams from environment variables or defaults"""
-        model_teams = {}
-
-        # Load custom model teams from environment
-        team_a_models = os.getenv("ARCHGURU_TEAM_A_MODELS", "").split(",")
-        team_b_models = os.getenv("ARCHGURU_TEAM_B_MODELS", "").split(",")
-        team_c_models = os.getenv("ARCHGURU_TEAM_C_MODELS", "").split(",")
-
-        # Use environment variables if provided, otherwise use defaults
-        model_teams["team_a"] = [m.strip() for m in team_a_models if m.strip()] or cls.DEFAULT_MODEL_TEAMS["team_a"]
-        model_teams["team_b"] = [m.strip() for m in team_b_models if m.strip()] or cls.DEFAULT_MODEL_TEAMS["team_b"]
-        model_teams["team_c"] = [m.strip() for m in team_c_models if m.strip()] or cls.DEFAULT_MODEL_TEAMS["team_c"]
-
-        return model_teams
+    def get_models(cls) -> List[str]:
+        """Get competing models from ARCHGURU_MODELS environment variable or defaults"""
+        models_env = os.getenv("ARCHGURU_MODELS", "")
+        if models_env:
+            return [m.strip() for m in models_env.split(",") if m.strip()]
+        return cls.DEFAULT_MODELS
 
     @classmethod
     def get_arbiter_model(cls) -> str:

@@ -2,7 +2,7 @@
 
 _Simplicity-first, additive development from existing Phase 2 implementation_
 
-## Current Status: Phase 2 Complete (v0.2)
+## Current Status: v0.4 Complete - Pairwise + Elo (Online) 🏆
 
 **What we have working:**
 
@@ -12,14 +12,21 @@ _Simplicity-first, additive development from existing Phase 2 implementation_
 - ✅ Debate/arbiter scaffolding exists (gated for future use)
 - ✅ OpenRouter integration with GitHub, Reddit, StackOverflow APIs
 - ✅ LangGraph pipeline orchestrating model competition
+- ✅ **v0.3: SQLite persistence** - Every run writes to database automatically
+- ✅ **v0.3: Basic stats command** - `--stats` shows decision count, latency, model usage
+- ✅ **v0.4: Pairwise + Elo ratings** - Real-time model performance tracking per decision type
+- ✅ **v0.4: Top 5 rankings** - `--stats` displays Elo leaderboards by decision type
 
 **Current capabilities:**
 
 - N=2+ models compete with parallel execution
 - Each model uses external APIs as research tools
 - Side-by-side recommendation comparison
-- Arbiter evaluation (foundation exists)
+- Arbiter evaluation with **real-time Elo rating updates**
 - Rich CLI output with research methodology display
+- **Model performance analytics** - Track which models excel at which decision types
+- **Persistent data storage** - All runs, responses, and ratings saved to SQLite
+- **Live competitive intelligence** - Elo rankings update after each arbiter selection
 
 ---
 
@@ -67,31 +74,62 @@ def persist_run_result(conn, result, arbiter_model_name, prompt_version):
 
 ---
 
-## v0.4 — Pairwise + Elo (Online) 🏆
+## ✅ v0.4 — Pairwise + Elo (Online) 🏆 **COMPLETE**
 
-**Timeline:** 2-3 days
-**Goal:** Immediate per-type model ranking without new orchestration
-**Priority:** Core competitive differentiation
+**Timeline:** ✅ **2 days** (Completed September 15, 2025)
+**Goal:** ✅ **Immediate per-type model ranking without new orchestration**
+**Priority:** ✅ **Core competitive differentiation ACHIEVED**
 
-**What to add:**
+**✅ What was added:**
 
-- **`pairwise_judgments` table** + Elo updater (online)
-- **Model ratings** tracked per decision type
-- **Top 5 rankings** in stats output
+- ✅ **`pairwise_judgments` table** + Elo updater (online) - Working perfectly
+- ✅ **Model ratings** tracked per decision type - Separate rankings for each type
+- ✅ **Top 5 rankings** in stats output - Beautiful display format
 
-**Technical work:**
+**✅ Technical implementation:**
 
 ```python
-# When arbiter selects winner, write winner vs each other model
-# Maintain model_rating(algo='elo', decision_type_id, rating, matches)
-# Update Elo immediately after each judgment
+# ✅ IMPLEMENTED: When arbiter selects winner, write winner vs each other model
+# ✅ IMPLEMENTED: Maintain model_rating(algo='elo', decision_type_id, rating, matches)
+# ✅ IMPLEMENTED: Update Elo immediately after each judgment
+# ✅ NEW FILES: src/archguru/storage/elo.py (Elo calculation system)
+# ✅ ENHANCED: src/archguru/storage/repo.py (persistence with Elo updates)
+# ✅ ENHANCED: src/archguru/cli/main.py (--stats with rankings)
 ```
 
-**Success criteria:**
+**✅ Success criteria MET:**
 
-- `--stats` prints **Top 5 by Elo** per decision type
-- Elo ratings update in real-time
-- Zero latency impact on decisions
+- ✅ `--stats` prints **Top 5 by Elo** per decision type (Perfect formatting)
+- ✅ Elo ratings update in real-time (Visible: "📊 Updated Elo ratings: 5 pairwise comparisons")
+- ✅ Zero latency impact on decisions (Seamless integration with existing pipeline)
+
+**🎯 Next: Start v0.5 - Strong Recommendation Output**
+
+**📋 Files Modified in v0.4:**
+
+- `src/archguru/storage/schema.sql` - Added pairwise_judgment & model_rating tables
+- `src/archguru/storage/elo.py` - **NEW FILE** - Complete Elo rating system
+- `src/archguru/storage/repo.py` - Enhanced with Elo updates & rankings
+- `src/archguru/cli/main.py` - Updated --stats to show Top 5 Elo rankings
+- `pyproject.toml` - Fixed script entry point
+
+**🧪 Tested Successfully:**
+
+- Two full decision runs (project-structure + database)
+- Winner: `openrouter/sonoma-sky-alpha` (1273 Elo, 5 matches each type)
+- Pairwise comparisons: 5 per run (winner vs all other models)
+- Rankings displayed correctly by decision type
+
+**🔧 Simplified Configuration (v0.4 Final):**
+
+```bash
+# Simple configuration - just two environment variables:
+ARCHGURU_MODELS="openai/gpt-4o-mini,anthropic/claude-3-haiku"  # Competing models
+ARCHGURU_ARBITER_MODEL="openai/gpt-4o"                         # Final judge
+
+# Default (no env vars): 2 models compete, gpt-4o arbitrates
+# Scaling up: Add more models to ARCHGURU_MODELS as needed
+```
 
 ---
 

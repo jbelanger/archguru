@@ -194,7 +194,7 @@ class OpenRouterClient:
 
             return ModelResponse(
                 model_name=model_name,
-                team="research",
+                team="competitor",
                 recommendation=recommendation,
                 reasoning=reasoning,
                 trade_offs=["Analysis based on research"],
@@ -207,18 +207,19 @@ class OpenRouterClient:
             print(f"❌ Error with {model_name}: {str(e)}")
             return ModelResponse(
                 model_name=model_name,
-                team="research",
+                team="competitor",
                 recommendation=f"Error: {str(e)}",
                 reasoning="Model failed to respond",
                 trade_offs=[],
                 confidence_score=0.0,
                 response_time=time.time() - start_time,
+                success=False,  # v0.4: Explicit failure flag
                 research_steps=research_steps
             )
 
 
-    async def run_model_team_competition(self, decision_type: str, language: str = None,
-                                       framework: str = None, requirements: str = None) -> List[ModelResponse]:
+    async def run_model_competition(self, decision_type: str, language: str = None,
+                                   framework: str = None, requirements: str = None) -> List[ModelResponse]:
         """Run multi-model team competition for Phase 2"""
         prompt = f"""You are an expert software architect competing with other AI models to provide the best architectural guidance. I need your help with an architectural decision.
 
@@ -241,45 +242,40 @@ Your response will be compared against other AI models, so provide:
 
 Focus on practical, production-ready advice based on real-world evidence. Be confident and specific in your recommendations."""
 
-        model_teams = Config.get_model_teams()
+        models = Config.get_models()
         responses = []
 
-        print("🏆 Starting model team competition...")
+        print("🏆 Starting model competition...")
 
-        # Run all models concurrently for better performance
-        tasks = []
-        for team_name, models in model_teams.items():
-            for model_name in models:
-                print(f"  🤖 {team_name.upper()}: {model_name}")
-                task = self.get_model_response(model_name, prompt)
-                tasks.append(task)
+        # Build list of (model, task) pairs for cleaner async handling
+        jobs = []
+        for model_name in models:
+            print(f"  🤖 {model_name}")
+            task = self.get_model_response(model_name, prompt)
+            jobs.append((model_name, task))
 
         # Execute all models concurrently
-        model_responses = await asyncio.gather(*tasks, return_exceptions=True)
+        model_responses = await asyncio.gather(*(job[1] for job in jobs), return_exceptions=True)
 
-        # Process results and handle any exceptions
-        model_index = 0
-        for team_name, models in model_teams.items():
-            for model_name in models:
-                if model_index < len(model_responses):
-                    response = model_responses[model_index]
-                    if isinstance(response, Exception):
-                        # Create error response for failed models
-                        error_response = ModelResponse(
-                            model_name=model_name,
-                            team=team_name,
-                            recommendation=f"Error: {str(response)}",
-                            reasoning="Model failed to respond",
-                            trade_offs=[],
-                            confidence_score=0.0,
-                            response_time=0.0,
-                            research_steps=[]
-                        )
-                        responses.append(error_response)
-                    else:
-                        # Update team name for successful responses
-                        response.team = team_name
-                        responses.append(response)
-                model_index += 1
+        # Process results with correct model pairing
+        for (model_name, _), response in zip(jobs, model_responses):
+            if isinstance(response, Exception):
+                # Create error response for failed models
+                error_response = ModelResponse(
+                    model_name=model_name,
+                    team="competitor",  # Simple team name since teams are eliminated
+                    recommendation=f"Error: {str(response)}",
+                    reasoning="Model failed to respond",
+                    trade_offs=[],
+                    confidence_score=0.0,
+                    response_time=0.0,
+                    success=False,  # v0.4: Explicit failure flag
+                    research_steps=[]
+                )
+                responses.append(error_response)
+            else:
+                # Set simple team name for successful responses
+                response.team = "competitor"
+                responses.append(response)
 
         return responses

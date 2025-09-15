@@ -96,7 +96,8 @@ DEBATE SUMMARY:
                 "debate_summary": summary,
                 "consensus_recommendation": consensus,
                 "arbiter_evaluation": evaluation,
-                "arbiter_model": arbiter_model
+                "arbiter_model": arbiter_model,
+                "winner_source": "arbiter"  # v0.4: Track selection method
             }
 
         except Exception as e:
@@ -170,7 +171,7 @@ DEBATE SUMMARY:
         best_score = -1
 
         for response in responses:
-            if response.recommendation.startswith("Error:"):
+            if not getattr(response, 'success', True):
                 continue
 
             score = (
@@ -188,11 +189,13 @@ DEBATE SUMMARY:
                 "winning_model": best_response.model_name,
                 "debate_summary": f"Winner selected by fallback scoring (score: {best_score:.1f})",
                 "consensus_recommendation": best_response.recommendation,
-                "arbiter_evaluation": "Fallback evaluation used due to arbiter failure"
+                "arbiter_evaluation": "Fallback evaluation used due to arbiter failure",
+                "winner_source": "fallback"  # v0.4: Track selection method
             }
         else:
             return {
                 "winning_model": responses[0].model_name,
                 "debate_summary": "All models failed, selected first response",
-                "consensus_recommendation": responses[0].recommendation
+                "consensus_recommendation": responses[0].recommendation,
+                "winner_source": "fallback"  # v0.4: Track selection method
             }

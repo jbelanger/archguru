@@ -30,6 +30,7 @@ class ModelResponse:
     trade_offs: List[str]
     confidence_score: float
     response_time: float
+    success: bool = True  # v0.4: Explicit success flag instead of checking "Error:" prefix
     research_steps: List[Dict[str, Any]] = None
     timestamp: datetime = None
 

@@ -44,7 +44,7 @@ class ModelCompetitionPipeline:
         request = state["request"]
 
         try:
-            responses = await self.client.run_model_team_competition(
+            responses = await self.client.run_model_competition(
                 decision_type=request.decision_type,
                 language=request.language,
                 framework=request.framework,
@@ -80,6 +80,7 @@ class ModelCompetitionPipeline:
                 "consensus_recommendation": debate_result["consensus_recommendation"],
                 "debate_summary": debate_result["debate_summary"],
                 "arbiter_evaluation": debate_result.get("arbiter_evaluation"),
+                "winner_source": debate_result.get("winner_source", "unknown"),  # v0.4: Track selection method
                 "current_step": "debate_complete"
             }
 
@@ -96,7 +97,7 @@ class ModelCompetitionPipeline:
         consensus = state.get("consensus_recommendation")
 
         if responses and winning_model and consensus:
-            successful_models = [r for r in responses if not r.recommendation.startswith("Error:")]
+            successful_models = [r for r in responses if getattr(r, 'success', True)]
             return {
                 "consensus_recommendation": consensus,
                 "debate_summary": f"Competition complete: {len(successful_models)}/{len(responses)} models succeeded. Winner: {winning_model}",

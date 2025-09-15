@@ -54,6 +54,40 @@ CREATE TABLE IF NOT EXISTS tool_call (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- v0.4 - Pairwise + Elo Rating Tables
+CREATE TABLE IF NOT EXISTS pairwise_judgment (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT REFERENCES run(id) ON DELETE CASCADE,
+  decision_type_id INTEGER REFERENCES decision_type(id),
+  judge_model_id INTEGER REFERENCES model(id),
+  winner_model_id INTEGER REFERENCES model(id),
+  loser_model_id INTEGER REFERENCES model(id),
+  reason TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(run_id, winner_model_id, loser_model_id)
+);
+
+CREATE TABLE IF NOT EXISTS model_rating (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  model_id INTEGER REFERENCES model(id),
+  decision_type_id INTEGER REFERENCES decision_type(id),
+  algo TEXT NOT NULL DEFAULT 'elo', -- "elo" | "trueskill"
+  rating REAL DEFAULT 1200.0,        -- Elo rating (start at 1200)
+  k_factor REAL DEFAULT 32.0,        -- Elo K factor
+  mu REAL,                           -- TrueSkill mu (future)
+  sigma REAL,                        -- TrueSkill sigma (future)
+  matches INTEGER DEFAULT 0,
+  last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(model_id, decision_type_id, algo)
+);
+
+-- Performance indexes for v0.4
+CREATE INDEX IF NOT EXISTS idx_model_rating_type_rating
+  ON model_rating(decision_type_id, algo, rating DESC);
+
+CREATE INDEX IF NOT EXISTS idx_pairwise_type_time
+  ON pairwise_judgment(decision_type_id, created_at);
+
 -- Insert default decision types
 INSERT OR IGNORE INTO decision_type (key, label) VALUES
   ('project-structure', 'Project Structure'),

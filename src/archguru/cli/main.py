@@ -99,8 +99,8 @@ async def run_decision(args) -> int:
                     'trade_offs': response.trade_offs,
                     'confidence_score': response.confidence_score,
                     'response_time_sec': response.response_time,
-                    'success': not response.recommendation.startswith("Error:"),
-                    'error': response.recommendation if response.recommendation.startswith("Error:") else None,
+                    'success': getattr(response, 'success', True),
+                    'error': response.recommendation if not getattr(response, 'success', True) else None,
                     'tool_calls': [
                         {
                             'function': step.get('function', ''),
@@ -121,7 +121,9 @@ async def run_decision(args) -> int:
                 arbiter_model=Config.get_arbiter_model(),
                 consensus_recommendation=result.consensus_recommendation,
                 debate_summary=result.debate_summary,
-                total_time_sec=total_time
+                total_time_sec=total_time,
+                winning_model=result.winning_model,  # v0.4: Pass winner for Elo updates
+                winner_source=getattr(result, 'winner_source', None)  # v0.4: Pass selection method
             )
             print(f"\n💾 Run saved: {run_id}")
         except Exception as e:
@@ -144,7 +146,7 @@ async def _display_competition_results(result, verbose: bool = False):
         return "\n".join((text or "").strip().splitlines()[:lines])
 
     responses = result.model_responses or []
-    successful_responses = [r for r in responses if not r.recommendation.startswith("Error:")]
+    successful_responses = [r for r in responses if getattr(r, "success", True)]
 
     print(f"\n🏆 Competition Results:")
     print(f"Models competed: {len(responses)}")
@@ -160,7 +162,7 @@ async def _display_competition_results(result, verbose: bool = False):
         # v0.2 requirement: side-by-side recommendations + research approach
         print(f"\n🧪 Side-by-side recommendations:")
         for r in responses:
-            if r.recommendation.startswith("Error:"):
+            if not getattr(r, 'success', True):
                 continue
             funcs = [step.get("function", "") for step in (r.research_steps or [])]
             print(f"\n--- {r.model_name} ({r.team}) — {r.response_time:.2f}s ---")
@@ -170,11 +172,11 @@ async def _display_competition_results(result, verbose: bool = False):
 
         print(f"\n🎯 Individual Model Performance:")
         for i, response in enumerate(responses, 1):
-            status = "✅" if not response.recommendation.startswith("Error:") else "❌"
+            status = "✅" if getattr(response, 'success', True) else "❌"
             print(f"  {i}. {status} {response.model_name} ({response.team})")
             print(f"     Research: {len(response.research_steps)} steps")
             print(f"     Time: {response.response_time:.2f}s")
-            if response.recommendation.startswith("Error:"):
+            if not getattr(response, 'success', True):
                 print(f"     Error: {response.recommendation}")
             print()
 
@@ -206,6 +208,19 @@ async def show_stats() -> int:
             print(f"\n🤖 Model Usage:")
             for model in stats['model_usage'][:5]:  # Top 5
                 print(f"  {model['name']}: {model['responses']} responses")
+
+        # v0.4: Display Elo rankings by decision type
+        if stats.get('elo_rankings'):
+            print(f"\n🏆 Top 5 Models by Elo Rating:")
+            for decision_type, rankings in stats['elo_rankings'].items():
+                if rankings:  # Only show if there are rankings
+                    print(f"\n  📊 {decision_type}:")
+                    for i, model in enumerate(rankings[:5], 1):
+                        rating = model['rating']
+                        matches = model['matches']
+                        print(f"    {i}. {model['model_name']}: {rating:.0f} Elo ({matches} matches)")
+        else:
+            print(f"\n🏆 No Elo ratings yet - run some decisions to see model rankings!")
 
         return 0
 
