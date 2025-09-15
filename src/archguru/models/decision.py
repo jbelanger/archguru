@@ -50,3 +50,4 @@ class DecisionResult:
     consensus_recommendation: Optional[str] = None
     debate_summary: Optional[str] = None
     total_time: Optional[float] = None
+    winner_source: Optional[str] = None

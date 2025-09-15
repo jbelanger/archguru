@@ -77,7 +77,9 @@ EVALUATION:
 [Your detailed analysis of why this model won, referencing specific strengths and addressing weaknesses of other responses]
 
 CONSENSUS RECOMMENDATION:
-[Your synthesized recommendation that combines the best aspects of all responses]
+Start with: "Final Recommendation: <one concise sentence>"
+Then provide 3–6 reasoning bullets, trade-offs, and 3–7 implementation steps.
+Include a short "Evidence:" bullet list if you referenced any repos.
 
 DEBATE SUMMARY:
 [Brief summary of the key differences between models and what made the winner stand out]"""
@@ -153,9 +155,33 @@ DEBATE SUMMARY:
         return (
             winner or "No winner selected",
             evaluation.strip() or "No evaluation provided",
-            consensus.strip() or "No consensus reached",
+            self._ensure_strong_reco(consensus.strip()) or "Final Recommendation: No consensus reached.",
             summary.strip() or "No summary available"
         )
+
+    def _ensure_strong_reco(self, text: str) -> str:
+        """Post-parse guard to ensure recommendation starts with 'Final Recommendation:'"""
+        if not text:
+            return "Final Recommendation: No consensus reached."
+        t = text.strip()
+
+        # If the model already complied, keep exactly that line
+        for line in t.splitlines():
+            s = line.strip()
+            if s.lower().startswith("final recommendation:"):
+                return s
+
+        # Skip headings and pick the first substantive line
+        skip = {"reasoning:", "trade-offs:", "implementation steps:", "evidence:"}
+        for line in t.splitlines():
+            s = line.strip()
+            if not s or s.lower() in skip or s.endswith(":"):
+                continue
+            first_sentence = s.split(".")[0].strip()
+            if first_sentence:
+                print(f"     🔧 Guard: normalized consensus header")
+                return f"Final Recommendation: {first_sentence[:160]}."
+        return "Final Recommendation: No consensus reached."
 
     def _fallback_evaluation(self, responses: List[ModelResponse]) -> Dict[str, Any]:
         """Fallback evaluation based on simple metrics when arbiter fails"""
@@ -188,7 +214,7 @@ DEBATE SUMMARY:
             return {
                 "winning_model": best_response.model_name,
                 "debate_summary": f"Winner selected by fallback scoring (score: {best_score:.1f})",
-                "consensus_recommendation": best_response.recommendation,
+                "consensus_recommendation": self._ensure_strong_reco(best_response.recommendation),
                 "arbiter_evaluation": "Fallback evaluation used due to arbiter failure",
                 "winner_source": "fallback"  # v0.4: Track selection method
             }
@@ -196,6 +222,6 @@ DEBATE SUMMARY:
             return {
                 "winning_model": responses[0].model_name,
                 "debate_summary": "All models failed, selected first response",
-                "consensus_recommendation": responses[0].recommendation,
+                "consensus_recommendation": self._ensure_strong_reco(responses[0].recommendation),
                 "winner_source": "fallback"  # v0.4: Track selection method
             }
