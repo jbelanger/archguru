@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS run (
   debate_summary TEXT,
   total_time_sec REAL,
   error TEXT,
+  arbiter_eval TEXT,  -- Added for v0.6 to store full arbiter evaluation
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

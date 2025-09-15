@@ -14,8 +14,7 @@ class ParsedResponse:
 class ResponseParser:
     """Centralized response parsing logic"""
     
-    @staticmethod
-    def parse_model_response(content: str) -> ParsedResponse:
+    def parse_model_response(self, content: str) -> ParsedResponse:
         """Parse model response with fallback logic"""
         if not content or not content.strip():
             return ParsedResponse(
@@ -29,21 +28,24 @@ class ResponseParser:
         content = content.strip()
         
         # Extract recommendation
-        recommendation = ResponseParser._extract_recommendation(content)
+        recommendation = self._extract_recommendation(content)
         
         # Extract sections
-        sections = ResponseParser._extract_sections(content)
+        sections = self._extract_sections(content)
+        
+        # Fix: Join reasoning list into string if it's a list
+        reasoning_list = sections.get("reasoning", ["Analysis based on research"])
+        reasoning = "\n".join(reasoning_list) if isinstance(reasoning_list, list) else reasoning_list
         
         return ParsedResponse(
             recommendation=recommendation,
-            reasoning=sections.get("reasoning", "Analysis based on research"),
+            reasoning=reasoning,
             trade_offs=sections.get("trade_offs", []),
             implementation_steps=sections.get("implementation", []),
             evidence=sections.get("evidence", [])
         )
     
-    @staticmethod
-    def _extract_recommendation(content: str) -> str:
+    def _extract_recommendation(self, content: str) -> str:
         """Extract recommendation with fallback"""
         # Try "Final Recommendation:" pattern
         match = re.search(r'Final Recommendation:\s*(.*?)(?:\n|$)', content, re.DOTALL)
@@ -56,8 +58,7 @@ class ResponseParser:
             return lines[0][:200]
         return content[:200]
     
-    @staticmethod
-    def _extract_sections(content: str) -> dict:
+    def _extract_sections(self, content: str) -> dict:
         """Extract structured sections from content"""
         sections = {}
         current_section = None
@@ -101,8 +102,7 @@ class ResponseParser:
             
         return sections
 
-    @staticmethod
-    def ensure_final_recommendation(text: str) -> str:
+    def ensure_final_recommendation(self, text: str) -> str:
         """Ensure text starts with 'Final Recommendation:'"""
         if not text:
             return "Final Recommendation: No consensus reached."

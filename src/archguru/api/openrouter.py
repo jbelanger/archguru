@@ -4,11 +4,15 @@ Handles LLM requests with research tool access
 """
 import asyncio
 import json
-import re
 from typing import List, Optional
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
 from ..core.config import Config
+from ..core.constants import (
+    MODEL_MAX_TOKENS, MODEL_TEMPERATURE,
+    DEFAULT_TOOL_RESULTS, MAX_TOOL_RESULTS
+)
+from ..core.response_parser import ResponseParser
 from ..models.decision import ModelResponse
 from .github import GitHubClient
 from .reddit import RedditClient
@@ -48,6 +52,7 @@ class OpenRouterClient:
         self.github = GitHubClient()
         self.reddit = RedditClient()
         self.stackoverflow = StackOverflowClient()
+        self.parser = ResponseParser()
 
     def get_research_tools(self) -> List[ChatCompletionToolParam]:
         """Define available research tools for the LLM"""
@@ -62,7 +67,7 @@ class OpenRouterClient:
                         "properties": {
                             "query": {"type": "string", "description": "Search query"},
                             "language": {"type": "string", "description": "Programming language filter"},
-                            "limit": {"type": "integer", "description": "Number of results (max 10)", "default": 5}
+                            "limit": {"type": "integer", "description": f"Number of results (max {MAX_TOOL_RESULTS})", "default": DEFAULT_TOOL_RESULTS}
                         },
                         "required": ["query"]
                     }
@@ -78,7 +83,7 @@ class OpenRouterClient:
                         "properties": {
                             "query": {"type": "string", "description": "Search query"},
                             "subreddits": {"type": "array", "items": {"type": "string"}, "description": "Specific subreddits to search"},
-                            "limit": {"type": "integer", "description": "Number of results (max 10)", "default": 5}
+                            "limit": {"type": "integer", "description": f"Number of results (max {MAX_TOOL_RESULTS})", "default": DEFAULT_TOOL_RESULTS}
                         },
                         "required": ["query"]
                     }
@@ -94,7 +99,7 @@ class OpenRouterClient:
                         "properties": {
                             "query": {"type": "string", "description": "Search query"},
                             "tags": {"type": "array", "items": {"type": "string"}, "description": "Technology tags to filter by"},
-                            "limit": {"type": "integer", "description": "Number of results (max 10)", "default": 5}
+                            "limit": {"type": "integer", "description": f"Number of results (max {MAX_TOOL_RESULTS})", "default": DEFAULT_TOOL_RESULTS}
                         },
                         "required": ["query"]
                     }
@@ -106,6 +111,10 @@ class OpenRouterClient:
         """Execute a tool call and return results"""
         function_name = tool_call.function.name
         arguments = json.loads(tool_call.function.arguments)
+
+        # Clamp limit to MAX_TOOL_RESULTS
+        if 'limit' in arguments:
+            arguments['limit'] = min(arguments['limit'], MAX_TOOL_RESULTS)
 
         try:
             if function_name == "search_github_repos":
@@ -135,14 +144,14 @@ class OpenRouterClient:
             messages: List[ChatCompletionMessageParam] = [{"role": "user", "content": prompt}]
             tools = self.get_research_tools()
 
-            # Try initial request with tools
+            # Try initial request with tools using constants
             try:
                 response = self.client.chat.completions.create(
                     model=model_name,
                     messages=messages,
                     tools=tools,
-                    max_tokens=2000,
-                    temperature=0.7
+                    max_tokens=MODEL_MAX_TOKENS,
+                    temperature=MODEL_TEMPERATURE
                 )
             except Exception as tool_error:
                 # If tools fail (404/400), fallback to simple completion
@@ -151,27 +160,23 @@ class OpenRouterClient:
                     response = self.client.chat.completions.create(
                         model=model_name,
                         messages=messages,
-                        max_tokens=2000,
-                        temperature=0.7
+                        max_tokens=MODEL_MAX_TOKENS,
+                        temperature=MODEL_TEMPERATURE
                     )
                     # Return basic response without research
                     response_time = time.time() - start_time
                     content = response.choices[0].message.content
                     
-                    # v0.5: Simple parsing (keep original logic)
-                    parts = (content or "").split('\n\n', 2)
-                    recommendation = parts[0] if parts else (content or "")[:200]
-                    reasoning_text = parts[1] if len(parts) > 1 else "Basic response without research"
-                    trade_offs = ["No research performed"]
-                    confidence_score = 0.7
-
+                    # Use parser for consistency
+                    parsed = self.parser.parse_model_response(content or "")
+                    
                     return ModelResponse(
                         model_name=model_name,
                         team="basic",
-                        recommendation=recommendation,
-                        reasoning=reasoning_text,
-                        trade_offs=trade_offs,
-                        confidence_score=confidence_score,
+                        recommendation=parsed.recommendation,
+                        reasoning=parsed.reasoning,
+                        trade_offs=parsed.trade_offs if parsed.trade_offs else ["No research performed"],
+                        confidence_score=0.7,
                         response_time=response_time,
                         research_steps=[]
                     )
@@ -236,14 +241,14 @@ class OpenRouterClient:
                     model=model_name,
                     messages=messages,
                     tools=tools,
-                    max_tokens=2000,
-                    temperature=0.7
+                    max_tokens=MODEL_MAX_TOKENS,
+                    temperature=MODEL_TEMPERATURE
                 )
 
             response_time = time.time() - start_time
             content = response.choices[0].message.content
 
-            # v0.5: Better parsing with validation and logging
+            # Use parser for consistency
             if not content or content.strip() == "":
                 print(f"  ⚠️  {model_name} returned empty content (research steps: {len(research_steps)}, time: {response_time:.2f}s)")
                 return ModelResponse(
@@ -258,35 +263,16 @@ class OpenRouterClient:
                     research_steps=research_steps
                 )
 
-            # Improved parsing for various response formats
-            content_clean = content.strip()
-
-            # Try to find "Final Recommendation:" pattern
-            final_recommendation_match = re.search(r'Final Recommendation:\s*(.*?)(?:\n|$)', content_clean, re.DOTALL)
-            if final_recommendation_match:
-                recommendation = f"Final Recommendation: {final_recommendation_match.group(1).strip()}"
-            else:
-                # Fallback: use first meaningful line or first 200 chars
-                lines = [line.strip() for line in content_clean.split('\n') if line.strip()]
-                recommendation = lines[0] if lines else content_clean[:200]
-                print(f"  🔧 {model_name} using fallback parsing (no 'Final Recommendation:' found)")
-                if len(content_clean) < 200:
-                    print(f"  📝 {model_name} short response ({len(content_clean)} chars): {repr(content_clean[:100])}")
-
-            # Extract reasoning - look for patterns or use remaining content
-            reasoning_parts = content_clean.split('\n\n')
-            reasoning_text = reasoning_parts[1] if len(reasoning_parts) > 1 else "Analysis based on research"
-
-            trade_offs = ["Analysis based on research"]
-            confidence_score = 0.8
+            # Parse response using ResponseParser
+            parsed = self.parser.parse_model_response(content)
 
             return ModelResponse(
                 model_name=model_name,
                 team="competitor",
-                recommendation=recommendation,
-                reasoning=reasoning_text,
-                trade_offs=trade_offs,
-                confidence_score=confidence_score,
+                recommendation=parsed.recommendation,
+                reasoning=parsed.reasoning,
+                trade_offs=parsed.trade_offs if parsed.trade_offs else ["Analysis based on research"],
+                confidence_score=0.8,
                 response_time=response_time,
                 research_steps=research_steps
             )
@@ -310,7 +296,7 @@ class OpenRouterClient:
                 trade_offs=[],
                 confidence_score=0.0,
                 response_time=time.time() - start_time,
-                success=False,  # v0.4: Explicit failure flag
+                success=False,
                 research_steps=research_steps
             )
 
@@ -355,13 +341,13 @@ Focus on practical, production-ready advice. Be confident and specific in your r
                 # Create error response for failed models
                 error_response = ModelResponse(
                     model_name=model_name,
-                    team="competitor",  # Simple team name since teams are eliminated
+                    team="competitor",
                     recommendation=f"Error: {str(response)}",
                     reasoning="Model failed to respond",
                     trade_offs=[],
                     confidence_score=0.0,
                     response_time=0.0,
-                    success=False,  # v0.4: Explicit failure flag
+                    success=False,
                     research_steps=[]
                 )
                 responses.append(error_response)

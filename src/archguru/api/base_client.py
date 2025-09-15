@@ -1,3 +1,6 @@
+"""
+Base API client with common functionality
+"""
 import requests
 from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
