@@ -129,5 +129,6 @@ class ModelCompetitionPipeline:
             model_responses=result.get("model_responses", []),
             winning_model=result.get("winning_model"),
             consensus_recommendation=result.get("consensus_recommendation"),
-            debate_summary=result.get("debate_summary", "Competition complete")
+            debate_summary=result.get("debate_summary", "Competition complete"),
+            winner_source=result.get("winner_source")
         )

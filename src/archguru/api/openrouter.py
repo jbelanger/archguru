@@ -13,6 +13,22 @@ from .reddit import RedditClient
 from .stackoverflow import StackOverflowClient
 import time
 
+# v0.5: Strict output format constant for team generation
+STRICT_OUTPUT_FORMAT = """OUTPUT FORMAT (STRICT):
+Final Recommendation: <one concise sentence>
+
+Reasoning:
+- <3–6 bullets, ≤12 words each>
+
+Trade-offs:
+- <2–5 bullets, name the axis>
+
+Implementation Steps:
+- <3–7 bullets, concrete>
+
+Evidence:
+- <0–5 GitHub links or repo names only>"""
+
 
 class OpenRouterClient:
     """Client for interacting with OpenRouter API with research tools"""
@@ -139,17 +155,21 @@ class OpenRouterClient:
                     # Return basic response without research
                     response_time = time.time() - start_time
                     content = response.choices[0].message.content
+                    
+                    # v0.5: Simple parsing (keep original logic)
                     parts = content.split('\n\n', 2)
                     recommendation = parts[0] if parts else content[:200]
-                    reasoning = parts[1] if len(parts) > 1 else "Basic response without research"
+                    reasoning_text = parts[1] if len(parts) > 1 else "Basic response without research"
+                    trade_offs = ["No research performed"]
+                    confidence_score = 0.7
 
                     return ModelResponse(
                         model_name=model_name,
                         team="basic",
                         recommendation=recommendation,
-                        reasoning=reasoning,
-                        trade_offs=["No research performed"],
-                        confidence_score=0.6,
+                        reasoning=reasoning_text,
+                        trade_offs=trade_offs,
+                        confidence_score=confidence_score,
                         response_time=response_time,
                         research_steps=[]
                     )
@@ -187,18 +207,20 @@ class OpenRouterClient:
             response_time = time.time() - start_time
             content = response.choices[0].message.content
 
-            # Parse the final response
+            # v0.5: Simple parsing (keep original logic)
             parts = content.split('\n\n', 2)
             recommendation = parts[0] if parts else content[:200]
-            reasoning = parts[1] if len(parts) > 1 else "See full response"
+            reasoning_text = parts[1] if len(parts) > 1 else "See full response"
+            trade_offs = ["Analysis based on research"]
+            confidence_score = 0.8
 
             return ModelResponse(
                 model_name=model_name,
                 team="competitor",
                 recommendation=recommendation,
-                reasoning=reasoning,
-                trade_offs=["Analysis based on research"],
-                confidence_score=0.8,
+                reasoning=reasoning_text,
+                trade_offs=trade_offs,
+                confidence_score=confidence_score,
                 response_time=response_time,
                 research_steps=research_steps
             )
@@ -233,14 +255,9 @@ Before making your recommendation, please research this topic using the availabl
 - Look at community discussions on Reddit
 - Check StackOverflow for technical considerations
 
-Your response will be compared against other AI models, so provide:
-1. Your specific recommendation with clear justification
-2. Detailed reasoning based on your research findings
-3. Trade-offs and alternatives you considered
-4. Implementation considerations and best practices
-5. Why your approach is superior to alternatives
+{STRICT_OUTPUT_FORMAT}
 
-Focus on practical, production-ready advice based on real-world evidence. Be confident and specific in your recommendations."""
+Focus on practical, production-ready advice. Be confident and specific in your recommendations. Your response will be compared against other AI models."""
 
         models = Config.get_models()
         responses = []
