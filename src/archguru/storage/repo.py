@@ -33,9 +33,9 @@ class ArchGuruRepo:
 
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
-            db_path = Path.home() / ".archguru" / "archguru.db"
-
-        self.db_path = Path(db_path)
+            self.db_path = Path.home() / ".archguru" / "archguru.db"
+        else:
+            self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
@@ -63,7 +63,7 @@ class ArchGuruRepo:
             "INSERT INTO model (name, provider) VALUES (?, ?)",
             (model_name, provider)
         )
-        return cursor.lastrowid
+        return cursor.lastrowid or 0
 
     def _get_decision_type_id(self, conn: sqlite3.Connection, decision_type: str) -> int:
         """Get decision_type_id, create if doesn't exist"""
@@ -77,7 +77,7 @@ class ArchGuruRepo:
             "INSERT INTO decision_type (key, label) VALUES (?, ?)",
             (decision_type, decision_type.replace('-', ' ').title())
         )
-        return cursor.lastrowid
+        return cursor.lastrowid or 0
 
     def persist_run_result(
         self,
@@ -148,12 +148,14 @@ class ArchGuruRepo:
                         self._update_elo_ratings_for_winner(
                             conn, run_id, result.winning_model,
                             result.model_responses, decision_type_id, arbiter_model_id,
-                            result.winner_source
+                            result.winner_source, getattr(result, 'arbiter_evaluation', None)
                         )
                     except Exception as e:
                         print(f"Warning: Failed to update Elo ratings: {str(e)}")
                 else:
                     print("ℹ️  Skipping Elo: no valid winner in this run")
+            else:
+                print("ℹ️  Skipping Elo: no winning_model set")
 
         return run_id
 
@@ -165,7 +167,8 @@ class ArchGuruRepo:
         model_responses: List[Dict[str, Any]],
         decision_type_id: int,
         judge_model_id: int,
-        winner_source: Optional[str] = None
+        winner_source: Optional[str] = None,
+        arbiter_evaluation: Optional[str] = None
     ):
         """Update Elo ratings when arbiter selects a winner"""
         # Get winner model ID
@@ -181,15 +184,55 @@ class ArchGuruRepo:
                 loser_model_ids.append(loser_id)
 
         if loser_model_ids:
-            # Set reason based on winner source
-            reason = "Arbiter selection" if winner_source == "arbiter" else "Fallback scoring"
+            # Create detailed reason based on winner source and evaluation
+            if winner_source == "arbiter" and arbiter_evaluation:
+                # Extract condensed reasoning from the rubric evaluation
+                reason = self._extract_pairwise_reason(arbiter_evaluation, winning_model_name)
+            else:
+                reason = "Arbiter selection" if winner_source == "arbiter" else "Fallback scoring"
 
             # Update Elo ratings for all pairwise comparisons
             updates = update_elo_ratings_for_run(
                 conn, run_id, winner_model_id, loser_model_ids,
                 decision_type_id, judge_model_id, reason
             )
-            print(f"  📊 Updated Elo ratings: {len(updates)} pairwise comparisons ({reason})")
+            print(f"  📊 Updated Elo ratings: {len(updates)} pairwise comparisons ({reason[:50]}...)")
+
+    def _extract_pairwise_reason(self, arbiter_evaluation: str, winning_model_name: str) -> str:
+        """Extract condensed reasoning from arbiter evaluation for pairwise judgment"""
+        if not arbiter_evaluation:
+            return "Arbiter selection"
+
+        # Look for winner reasoning section first
+        if "WINNER REASONING:" in arbiter_evaluation:
+            lines = arbiter_evaluation.split('\n')
+            winner_reasoning = []
+            in_winner_section = False
+
+            for line in lines:
+                line = line.strip()
+                if line.startswith("WINNER REASONING:"):
+                    in_winner_section = True
+                    continue
+                elif line.startswith("RUBRIC SCORING:") or line.startswith("CONSENSUS") or line.startswith("DEBATE"):
+                    in_winner_section = False
+                elif in_winner_section and line:
+                    winner_reasoning.append(line)
+
+            if winner_reasoning:
+                # Take first sentence and limit to 200 chars for database storage
+                reason = ' '.join(winner_reasoning)[:200]
+                return reason if reason else "Arbiter selection with structured evaluation"
+
+        # Fallback: try to find any meaningful assessment
+        lines = arbiter_evaluation.split('\n')
+        for line in lines:
+            line = line.strip()
+            if (winning_model_name.lower() in line.lower() and
+                any(word in line.lower() for word in ['better', 'superior', 'stronger', 'clearer', 'more', 'best'])):
+                return line[:200]
+
+        return "Arbiter selection with structured evaluation"
 
     def get_stats(self) -> Dict[str, Any]:
         """Get basic statistics for --stats command"""

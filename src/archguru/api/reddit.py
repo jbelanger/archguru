@@ -2,7 +2,7 @@
 Reddit API client for community research
 """
 import requests
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from ..core.config import Config
 
 
@@ -16,7 +16,7 @@ class RedditClient:
             "User-Agent": "archguru/1.0 (research bot)"
         })
 
-    def search_discussions(self, query: str, subreddits: List[str] = None,
+    def search_discussions(self, query: str, subreddits: Optional[List[str]] = None,
                           limit: int = 5) -> List[Dict[str, Any]]:
         """Search Reddit discussions"""
         if subreddits is None:

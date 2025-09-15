@@ -4,7 +4,7 @@ Online Elo rating updates for model performance tracking per decision type
 """
 
 import math
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional, Union
 import sqlite3
 
 def calculate_elo_update(
@@ -149,7 +149,7 @@ def update_elo_ratings_for_run(
 
 def get_top_models_by_elo(
     conn: sqlite3.Connection,
-    decision_type_id: int = None,
+    decision_type_id: Optional[int] = None,
     limit: int = 5
 ) -> List[Dict[str, Any]]:
     """
@@ -177,7 +177,7 @@ def get_top_models_by_elo(
             ORDER BY mr.rating DESC
             LIMIT ?
         """
-        params = (decision_type_id, limit)
+        params: Union[Tuple[int, int], Tuple[int]] = (decision_type_id, limit)
     else:
         query = """
             SELECT

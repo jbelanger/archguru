@@ -2,7 +2,7 @@
 GitHub API client for repository research
 """
 import requests
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Optional
 from ..core.config import Config
 
 
@@ -14,7 +14,7 @@ class GitHubClient:
         self.session = requests.Session()
         # GitHub API doesn't require auth for basic searches, but rate limited
 
-    def search_repositories(self, query: str, language: str = None,
+    def search_repositories(self, query: str, language: Optional[str] = None,
                           sort: str = "stars", limit: int = 5) -> List[Dict[str, Any]]:
         """Search GitHub repositories"""
         search_query = query

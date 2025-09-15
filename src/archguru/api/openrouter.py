@@ -4,7 +4,7 @@ Handles LLM requests with research tool access
 """
 import asyncio
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from openai import OpenAI
 from ..core.config import Config
 from ..models.decision import ModelResponse
@@ -240,8 +240,8 @@ class OpenRouterClient:
             )
 
 
-    async def run_model_competition(self, decision_type: str, language: str = None,
-                                   framework: str = None, requirements: str = None) -> List[ModelResponse]:
+    async def run_model_competition(self, decision_type: str, language: Optional[str] = None,
+                                   framework: Optional[str] = None, requirements: Optional[str] = None) -> List[ModelResponse]:
         """Run multi-model team competition for Phase 2"""
         prompt = f"""You are an expert software architect competing with other AI models to provide the best architectural guidance. I need your help with an architectural decision.
 
@@ -292,7 +292,8 @@ Focus on practical, production-ready advice. Be confident and specific in your r
                 responses.append(error_response)
             else:
                 # Set simple team name for successful responses
-                response.team = "competitor"
-                responses.append(response)
+                if isinstance(response, ModelResponse):
+                    response.team = "competitor"
+                    responses.append(response)
 
         return responses

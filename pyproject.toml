@@ -23,3 +23,9 @@ where = ["src"]
 
 [tool.uv]
 package = true
+
+[dependency-groups]
+dev = [
+    "mypy>=1.18.1",
+    "types-requests>=2.32.4.20250913",
+]

@@ -2,7 +2,7 @@
 StackOverflow API client for technical research
 """
 import requests
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from ..core.config import Config
 
 
@@ -13,7 +13,7 @@ class StackOverflowClient:
         self.base_url = "https://api.stackexchange.com/2.3"
         self.session = requests.Session()
 
-    def search_questions(self, query: str, tags: List[str] = None,
+    def search_questions(self, query: str, tags: Optional[List[str]] = None,
                         sort: str = "votes", limit: int = 5) -> List[Dict[str, Any]]:
         """Search StackOverflow questions"""
         params = {
@@ -50,7 +50,7 @@ class StackOverflowClient:
             print(f"StackOverflow search error: {e}")
             return []
 
-    def get_popular_tags(self, related_to: str = None, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_popular_tags(self, related_to: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
         """Get popular tags, optionally filtered"""
         params = {
             "order": "desc",

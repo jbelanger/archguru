@@ -2,8 +2,7 @@
 LangGraph pipeline for model team competition and debate
 Phase 2: Multi-model competition with cross-model debate
 """
-import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from langgraph.graph import StateGraph, END
 from ..core.state import CompetitionState
 from ..models.decision import DecisionRequest, DecisionResult
@@ -19,7 +18,7 @@ class ModelCompetitionPipeline:
         self.debate_engine = ModelDebateEngine()
         self.graph = self._build_graph()
 
-    def _build_graph(self) -> StateGraph:
+    def _build_graph(self) -> Any:
         """Build the LangGraph competition pipeline"""
         workflow = StateGraph(CompetitionState)
 
@@ -90,25 +89,27 @@ class ModelCompetitionPipeline:
                 "current_step": "error"
             }
 
-    async def _generate_final_result(self, state: CompetitionState) -> Dict[str, Any]:
+    async def _generate_final_result(self, state: CompetitionState) -> CompetitionState:
         """Generate final competition result"""
         responses = state["model_responses"]
         winning_model = state.get("winning_model")
         consensus = state.get("consensus_recommendation")
+        winner_source = state.get("winner_source")
+        arbiter_evaluation = state.get("arbiter_evaluation")
 
         if responses and winning_model and consensus:
             successful_models = [r for r in responses if getattr(r, 'success', True)]
-            return {
-                "consensus_recommendation": consensus,
-                "debate_summary": f"Competition complete: {len(successful_models)}/{len(responses)} models succeeded. Winner: {winning_model}",
-                "current_step": "complete"
-            }
+            # Update only specific fields instead of replacing the entire state
+            state["consensus_recommendation"] = consensus
+            state["debate_summary"] = f"Competition complete: {len(successful_models)}/{len(responses)} models succeeded. Winner: {winning_model}"
+            state["current_step"] = "complete"
+            return state  # Return the entire state to preserve all fields
         else:
-            return {
-                "consensus_recommendation": "Competition failed to produce results",
-                "debate_summary": "Model competition encountered errors",
-                "current_step": "complete"
-            }
+            # Update only specific fields instead of replacing the entire state
+            state["consensus_recommendation"] = "Competition failed to produce results"
+            state["debate_summary"] = "Model competition encountered errors"
+            state["current_step"] = "complete"
+            return state  # Return the entire state to preserve all fields
 
     async def run(self, request: DecisionRequest) -> DecisionResult:
         """Run the complete competition pipeline"""
@@ -117,6 +118,9 @@ class ModelCompetitionPipeline:
             "model_responses": [],
             "winning_model": None,
             "consensus_recommendation": None,
+            "debate_summary": None,
+            "arbiter_evaluation": None,
+            "winner_source": None,
             "error_message": None,
             "current_step": "starting"
         }
@@ -130,5 +134,6 @@ class ModelCompetitionPipeline:
             winning_model=result.get("winning_model"),
             consensus_recommendation=result.get("consensus_recommendation"),
             debate_summary=result.get("debate_summary", "Competition complete"),
+            arbiter_evaluation=result.get("arbiter_evaluation"),  # v0.6: Pass detailed evaluation
             winner_source=result.get("winner_source")
         )

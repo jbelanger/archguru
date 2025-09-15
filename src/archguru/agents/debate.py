@@ -3,6 +3,7 @@ Cross-model debate and evaluation logic for ArchGuru
 Handles model-vs-model competition and consensus building
 """
 import asyncio
+import re
 from typing import List, Dict, Any, Optional
 from ..models.decision import ModelResponse
 from ..api.openrouter import OpenRouterClient
@@ -38,17 +39,20 @@ class ModelDebateEngine:
 
     def _prepare_debate_context(self, responses: List[ModelResponse]) -> str:
         """Prepare context for the debate with all model responses"""
+        def clip(s, n):
+            return (s or "")[:n].rstrip()
+
         context = "ARCHITECTURAL DECISION RESPONSES FROM COMPETING AI MODELS:\n\n"
 
         for i, response in enumerate(responses, 1):
             context += f"=== MODEL {i}: {response.model_name} ===\n"
-            context += f"Recommendation: {response.recommendation}\n"
-            context += f"Reasoning: {response.reasoning}\n"
-            context += f"Research Steps: {len(response.research_steps)} tool calls\n"
+            context += f"Recommendation: {clip(response.recommendation, 240)}\n"
+            context += f"Reasoning: {clip(response.reasoning, 900)}\n"
+            context += f"Research Steps: {len(response.research_steps or [])} tool calls\n"
             context += f"Response Time: {response.response_time:.2f}s\n"
 
             if response.trade_offs:
-                context += f"Trade-offs: {', '.join(response.trade_offs)}\n"
+                context += f"Trade-offs: {', '.join(response.trade_offs[:5])}\n"
 
             context += "\n" + "="*50 + "\n\n"
 
@@ -62,19 +66,43 @@ class ModelDebateEngine:
 
 {debate_context}
 
-Your task is to:
-1. Analyze each model's recommendation for technical accuracy, completeness, and practicality
-2. Evaluate the quality of research each model performed
-3. Consider which recommendation would work best in production
-4. Select the winning model and explain why
-5. Synthesize the best ideas into a final consensus recommendation
+Your task is to evaluate each model's response using this structured rubric, then select the winner:
+
+EVALUATION RUBRIC (Rate each model 1-5 for each criterion):
+1. EVIDENCE QUALITY: How well-researched and credible are the sources/examples cited?
+2. RISK AWARENESS: Does the model identify key risks, limitations, and failure modes?
+3. CLARITY & STRUCTURE: Is the recommendation clear, well-organized, and actionable?
+4. PRODUCTION READINESS: How practical and implementable is the solution in real environments?
+
+For each model, provide a brief evaluation using this rubric, then select the overall winner.
 
 Provide your evaluation in this format:
 
-WINNER: [model_name]
+RUBRIC SCORING:
+Model 1 ({responses[0].model_name if responses else 'N/A'}):
+- Evidence Quality: [1-5]/5 - [brief reason]
+- Risk Awareness: [1-5]/5 - [brief reason]
+- Clarity & Structure: [1-5]/5 - [brief reason]
+- Production Readiness: [1-5]/5 - [brief reason]
 
-EVALUATION:
-[Your detailed analysis of why this model won, referencing specific strengths and addressing weaknesses of other responses]
+Model 2 ({responses[1].model_name if len(responses) > 1 else 'N/A'}):
+- Evidence Quality: [1-5]/5 - [brief reason]
+- Risk Awareness: [1-5]/5 - [brief reason]
+- Clarity & Structure: [1-5]/5 - [brief reason]
+- Production Readiness: [1-5]/5 - [brief reason]
+
+{f"Model 3 ({responses[2].model_name}):" if len(responses) > 2 else ""}
+{f"- Evidence Quality: [1-5]/5 - [brief reason]" if len(responses) > 2 else ""}
+{f"- Risk Awareness: [1-5]/5 - [brief reason]" if len(responses) > 2 else ""}
+{f"- Clarity & Structure: [1-5]/5 - [brief reason]" if len(responses) > 2 else ""}
+{f"- Production Readiness: [1-5]/5 - [brief reason]" if len(responses) > 2 else ""}
+
+WINNER: Model 1|Model 2|Model 3  (choose exactly one)
+
+Return ONLY the sections above with exact labels and no text before WINNER:
+
+WINNER REASONING:
+[One paragraph explaining why this model won based on the rubric scores and overall assessment]
 
 CONSENSUS RECOMMENDATION:
 Start with: "Final Recommendation: <one concise sentence>"
@@ -89,9 +117,20 @@ DEBATE SUMMARY:
         try:
             # Get arbiter's evaluation (without research tools for final judgment)
             arbiter_response = await self._get_arbiter_response(arbiter_model, arbiter_prompt)
+        except Exception as e1:
+            print(f"❌ Primary arbiter failed: {e1}. Retrying with backup model...")
+            backup = Config.get_models()[0]  # Use first competitor model as backup
+            try:
+                arbiter_response = await self._get_arbiter_response(backup, arbiter_prompt)
+                arbiter_model = backup
+                print(f"  ✅ Backup arbiter {backup} succeeded")
+            except Exception as e2:
+                print(f"❌ Backup arbiter failed: {e2}")
+                return self._fallback_evaluation(responses)
 
+        try:
             # Parse arbiter response
-            winner, evaluation, consensus, summary = self._parse_arbiter_response(arbiter_response)
+            winner, evaluation, consensus, summary = self._parse_arbiter_response(arbiter_response, responses)
 
             return {
                 "winning_model": winner,
@@ -103,7 +142,7 @@ DEBATE SUMMARY:
             }
 
         except Exception as e:
-            print(f"❌ Arbiter evaluation failed: {str(e)}")
+            print(f"❌ Arbiter response parsing failed: {str(e)}")
             # Fallback to simple scoring
             return self._fallback_evaluation(responses)
 
@@ -116,15 +155,16 @@ DEBATE SUMMARY:
                 max_tokens=1500,
                 temperature=0.3  # Lower temperature for more consistent evaluation
             )
-            return response.choices[0].message.content
+            return response.choices[0].message.content or ""
         except Exception as e:
             raise Exception(f"Arbiter model {model_name} failed: {str(e)}")
 
-    def _parse_arbiter_response(self, response: str) -> tuple:
-        """Parse the arbiter's structured response"""
+    def _parse_arbiter_response(self, response: str, responses: List[ModelResponse]) -> tuple:
+        """Parse the arbiter's structured response with rubric scoring"""
         lines = response.split('\n')
         winner = None
-        evaluation = ""
+        rubric_scores = ""
+        winner_reasoning = ""
         consensus = ""
         summary = ""
 
@@ -133,10 +173,15 @@ DEBATE SUMMARY:
         for line in lines:
             line = line.strip()
 
-            if line.startswith("WINNER:"):
-                winner = line.replace("WINNER:", "").strip()
-            elif line.startswith("EVALUATION:"):
-                current_section = "evaluation"
+            # Parse winner with flexible matching
+            if line.startswith("WINNER:") or line.startswith("Winner:") or line.startswith("CHOSEN:"):
+                winner_raw = re.sub(r'^(WINNER|Winner|CHOSEN)\s*[:\-]\s*', '', line, flags=re.IGNORECASE).strip()
+                winner = self._resolve_winner_token(winner_raw, responses)
+            elif line.startswith("RUBRIC SCORING:"):
+                current_section = "rubric"
+                continue
+            elif line.startswith("WINNER REASONING:"):
+                current_section = "winner_reasoning"
                 continue
             elif line.startswith("CONSENSUS RECOMMENDATION:"):
                 current_section = "consensus"
@@ -145,12 +190,21 @@ DEBATE SUMMARY:
                 current_section = "summary"
                 continue
             elif line and current_section:
-                if current_section == "evaluation":
-                    evaluation += line + "\n"
+                if current_section == "rubric":
+                    rubric_scores += line + "\n"
+                elif current_section == "winner_reasoning":
+                    winner_reasoning += line + "\n"
                 elif current_section == "consensus":
                     consensus += line + "\n"
                 elif current_section == "summary":
                     summary += line + "\n"
+
+        # Combine rubric scores and winner reasoning for the evaluation field
+        evaluation = ""
+        if rubric_scores.strip():
+            evaluation += "RUBRIC SCORING:\n" + rubric_scores.strip() + "\n\n"
+        if winner_reasoning.strip():
+            evaluation += "WINNER REASONING:\n" + winner_reasoning.strip()
 
         return (
             winner or "No winner selected",
@@ -158,6 +212,30 @@ DEBATE SUMMARY:
             self._ensure_strong_reco(consensus.strip()) or "Final Recommendation: No consensus reached.",
             summary.strip() or "No summary available"
         )
+
+    def _resolve_winner_token(self, token: str, responses: List[ModelResponse]) -> Optional[str]:
+        """Resolve winner token to actual model name"""
+        if not token:
+            return None
+
+        t = token.strip()
+
+        # Accept "Model 1" / "1" format - map to actual model name
+        m = re.match(r'^(?:Model\s*)?(\d+)$', t, re.IGNORECASE)
+        if m:
+            idx = int(m.group(1)) - 1
+            if 0 <= idx < len(responses):
+                return responses[idx].model_name
+            return None
+
+        # Accept direct model name (partial or full match)
+        if len(t) > 3:  # Avoid matching very short strings
+            t_low = t.lower()
+            for response in responses:
+                if t_low in response.model_name.lower():
+                    return response.model_name
+
+        return None
 
     def _ensure_strong_reco(self, text: str) -> str:
         """Post-parse guard to ensure recommendation starts with 'Final Recommendation:'"""
@@ -194,16 +272,16 @@ DEBATE SUMMARY:
 
         # Simple scoring: research steps + response quality + confidence
         best_response = None
-        best_score = -1
+        best_score = -1.0
 
         for response in responses:
             if not getattr(response, 'success', True):
                 continue
 
             score = (
-                len(response.research_steps) * 2 +  # Research effort
-                len(response.reasoning) / 50 +       # Reasoning depth
-                response.confidence_score * 10       # Model confidence
+                len(response.research_steps or []) * 2 +  # Research effort
+                len(response.reasoning or "") / 50 +       # Reasoning depth
+                (response.confidence_score or 0) * 10     # Model confidence
             )
 
             if score > best_score:
