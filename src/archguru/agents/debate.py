@@ -44,7 +44,16 @@ class ModelDebateEngine:
 
         context = "ARCHITECTURAL DECISION RESPONSES FROM COMPETING AI MODELS:\n\n"
 
+        valid_responses = []
         for i, response in enumerate(responses, 1):
+            # Skip failed responses for debate context
+            if not getattr(response, 'success', True) or not response.recommendation or response.recommendation.startswith("Error:"):
+                context += f"=== MODEL {i}: {response.model_name} ===\n"
+                context += f"STATUS: FAILED - {clip(response.recommendation, 100)}\n"
+                context += "\n" + "="*50 + "\n\n"
+                continue
+
+            valid_responses.append(response)
             context += f"=== MODEL {i}: {response.model_name} ===\n"
             context += f"Recommendation: {clip(response.recommendation, 240)}\n"
             context += f"Reasoning: {clip(response.reasoning, 900)}\n"
@@ -56,17 +65,45 @@ class ModelDebateEngine:
 
             context += "\n" + "="*50 + "\n\n"
 
+        # If no valid responses, return early
+        if not valid_responses:
+            context += "\nNOTE: No models provided valid responses for evaluation."
+
         return context
 
     async def _run_arbiter_evaluation(self, debate_context: str, responses: List[ModelResponse]) -> Dict[str, Any]:
         """Run final arbiter model to evaluate all responses and pick winner"""
+        # Check if we have valid responses to evaluate
+        valid_responses = [r for r in responses if getattr(r, 'success', True) and r.recommendation and not r.recommendation.startswith("Error:")]
+
+        if not valid_responses:
+            print(f"  ⚠️  No valid responses to evaluate (total responses: {len(responses)})")
+            return {
+                "winning_model": None,
+                "debate_summary": "No valid responses to evaluate",
+                "consensus_recommendation": "Final Recommendation: All models failed to provide valid responses.",
+                "arbiter_evaluation": "No models provided valid responses for evaluation",
+                "winner_source": "no_valid_responses"
+            }
+
+        if len(valid_responses) == 1:
+            winner = valid_responses[0]
+            print(f"  ℹ️  Only one valid response, auto-selecting {winner.model_name}")
+            return {
+                "winning_model": winner.model_name,
+                "debate_summary": f"Only one valid response from {winner.model_name}",
+                "consensus_recommendation": self._ensure_strong_reco(winner.recommendation),
+                "arbiter_evaluation": f"Single valid response from {winner.model_name}",
+                "winner_source": "single_valid"
+            }
+
         arbiter_model = Config.get_arbiter_model()
 
-        arbiter_prompt = f"""You are the final arbiter in an AI architecture competition. Below are responses from multiple AI models to the same architectural decision request.
+        arbiter_prompt = f"""You are an expert technical evaluator analyzing architectural recommendations. Below are responses from multiple AI systems providing guidance on the same architectural decision.
 
 {debate_context}
 
-Your task is to evaluate each model's response using this structured rubric, then select the winner:
+Your task is to evaluate each response using this structured rubric, then select the most comprehensive and practical recommendation:
 
 EVALUATION RUBRIC (Rate each model 1-5 for each criterion):
 1. EVIDENCE QUALITY: How well-researched and credible are the sources/examples cited?
@@ -74,43 +111,41 @@ EVALUATION RUBRIC (Rate each model 1-5 for each criterion):
 3. CLARITY & STRUCTURE: Is the recommendation clear, well-organized, and actionable?
 4. PRODUCTION READINESS: How practical and implementable is the solution in real environments?
 
-For each model, provide a brief evaluation using this rubric, then select the overall winner.
+For each response, provide a brief evaluation using this rubric, then select the most suitable recommendation.
 
 Provide your evaluation in this format:
 
-RUBRIC SCORING:
-Model 1 ({responses[0].model_name if responses else 'N/A'}):
+EVALUATION SCORING:
+Response 1 ({responses[0].model_name if responses else 'N/A'}):
 - Evidence Quality: [1-5]/5 - [brief reason]
 - Risk Awareness: [1-5]/5 - [brief reason]
 - Clarity & Structure: [1-5]/5 - [brief reason]
 - Production Readiness: [1-5]/5 - [brief reason]
 
-Model 2 ({responses[1].model_name if len(responses) > 1 else 'N/A'}):
+Response 2 ({responses[1].model_name if len(responses) > 1 else 'N/A'}):
 - Evidence Quality: [1-5]/5 - [brief reason]
 - Risk Awareness: [1-5]/5 - [brief reason]
 - Clarity & Structure: [1-5]/5 - [brief reason]
 - Production Readiness: [1-5]/5 - [brief reason]
 
-{f"Model 3 ({responses[2].model_name}):" if len(responses) > 2 else ""}
+{f"Response 3 ({responses[2].model_name}):" if len(responses) > 2 else ""}
 {f"- Evidence Quality: [1-5]/5 - [brief reason]" if len(responses) > 2 else ""}
 {f"- Risk Awareness: [1-5]/5 - [brief reason]" if len(responses) > 2 else ""}
 {f"- Clarity & Structure: [1-5]/5 - [brief reason]" if len(responses) > 2 else ""}
 {f"- Production Readiness: [1-5]/5 - [brief reason]" if len(responses) > 2 else ""}
 
-WINNER: Model 1|Model 2|Model 3  (choose exactly one)
+SELECTED: Response 1|Response 2|Response 3  (choose the most comprehensive)
 
-Return ONLY the sections above with exact labels and no text before WINNER:
-
-WINNER REASONING:
-[One paragraph explaining why this model won based on the rubric scores and overall assessment]
+SELECTION REASONING:
+[One paragraph explaining why this response was selected based on the evaluation scores]
 
 CONSENSUS RECOMMENDATION:
 Start with: "Final Recommendation: <one concise sentence>"
 Then provide 3–6 reasoning bullets, trade-offs, and 3–7 implementation steps.
 Include a short "Evidence:" bullet list if you referenced any repos.
 
-DEBATE SUMMARY:
-[Brief summary of the key differences between models and what made the winner stand out]"""
+SUMMARY:
+[Brief summary of the key differences between responses and what made the selected one stand out]"""
 
         print(f"  🏅 Arbiter evaluation using {arbiter_model}...")
 
@@ -132,6 +167,11 @@ DEBATE SUMMARY:
             # Parse arbiter response
             winner, evaluation, consensus, summary = self._parse_arbiter_response(arbiter_response, responses)
 
+            if winner and winner != "No winner selected":
+                print(f"  ✅ Arbiter selected: {winner}")
+            else:
+                print(f"  ⚠️  Arbiter failed to select winner: {winner}")
+
             return {
                 "winning_model": winner,
                 "debate_summary": summary,
@@ -143,6 +183,7 @@ DEBATE SUMMARY:
 
         except Exception as e:
             print(f"❌ Arbiter response parsing failed: {str(e)}")
+            print(f"  🔍 Arbiter response preview: {repr(arbiter_response[:200]) if 'arbiter_response' in locals() else 'No response available'}")
             # Fallback to simple scoring
             return self._fallback_evaluation(responses)
 
@@ -173,20 +214,20 @@ DEBATE SUMMARY:
         for line in lines:
             line = line.strip()
 
-            # Parse winner with flexible matching
-            if line.startswith("WINNER:") or line.startswith("Winner:") or line.startswith("CHOSEN:"):
-                winner_raw = re.sub(r'^(WINNER|Winner|CHOSEN)\s*[:\-]\s*', '', line, flags=re.IGNORECASE).strip()
+            # Parse selected response with flexible matching
+            if line.startswith("SELECTED:") or line.startswith("WINNER:") or line.startswith("Winner:") or line.startswith("CHOSEN:"):
+                winner_raw = re.sub(r'^(SELECTED|WINNER|Winner|CHOSEN)\s*[:\-]\s*', '', line, flags=re.IGNORECASE).strip()
                 winner = self._resolve_winner_token(winner_raw, responses)
-            elif line.startswith("RUBRIC SCORING:"):
+            elif line.startswith("EVALUATION SCORING:") or line.startswith("RUBRIC SCORING:"):
                 current_section = "rubric"
                 continue
-            elif line.startswith("WINNER REASONING:"):
+            elif line.startswith("SELECTION REASONING:") or line.startswith("WINNER REASONING:"):
                 current_section = "winner_reasoning"
                 continue
             elif line.startswith("CONSENSUS RECOMMENDATION:"):
                 current_section = "consensus"
                 continue
-            elif line.startswith("DEBATE SUMMARY:"):
+            elif line.startswith("DEBATE SUMMARY:") or line.startswith("SUMMARY:"):
                 current_section = "summary"
                 continue
             elif line and current_section:
@@ -220,8 +261,8 @@ DEBATE SUMMARY:
 
         t = token.strip()
 
-        # Accept "Model 1" / "1" format - map to actual model name
-        m = re.match(r'^(?:Model\s*)?(\d+)$', t, re.IGNORECASE)
+        # Accept "Model 1", "Response 1", or just "1" format - map to actual model name
+        m = re.match(r'^(?:(?:Model|Response)\s*)?(\d+)$', t, re.IGNORECASE)
         if m:
             idx = int(m.group(1)) - 1
             if 0 <= idx < len(responses):

@@ -4,8 +4,10 @@ Handles LLM requests with research tool access
 """
 import asyncio
 import json
-from typing import List, Dict, Any, Optional
+import re
+from typing import List, Optional
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
 from ..core.config import Config
 from ..models.decision import ModelResponse
 from .github import GitHubClient
@@ -18,16 +20,16 @@ STRICT_OUTPUT_FORMAT = """OUTPUT FORMAT (STRICT):
 Final Recommendation: <one concise sentence>
 
 Reasoning:
-- <3–6 bullets, ≤12 words each>
+- <3-6 bullets, ≤12 words each>
 
 Trade-offs:
-- <2–5 bullets, name the axis>
+- <2-5 bullets, name the axis>
 
 Implementation Steps:
-- <3–7 bullets, concrete>
+- <3-7 bullets, concrete>
 
 Evidence:
-- <0–5 GitHub links or repo names only>"""
+- <0-5 GitHub links or repo names only>"""
 
 
 class OpenRouterClient:
@@ -47,7 +49,7 @@ class OpenRouterClient:
         self.reddit = RedditClient()
         self.stackoverflow = StackOverflowClient()
 
-    def get_research_tools(self) -> List[Dict[str, Any]]:
+    def get_research_tools(self) -> List[ChatCompletionToolParam]:
         """Define available research tools for the LLM"""
         return [
             {
@@ -130,7 +132,7 @@ class OpenRouterClient:
         research_steps = []
 
         try:
-            messages = [{"role": "user", "content": prompt}]
+            messages: List[ChatCompletionMessageParam] = [{"role": "user", "content": prompt}]
             tools = self.get_research_tools()
 
             # Try initial request with tools
@@ -157,8 +159,8 @@ class OpenRouterClient:
                     content = response.choices[0].message.content
                     
                     # v0.5: Simple parsing (keep original logic)
-                    parts = content.split('\n\n', 2)
-                    recommendation = parts[0] if parts else content[:200]
+                    parts = (content or "").split('\n\n', 2)
+                    recommendation = parts[0] if parts else (content or "")[:200]
                     reasoning_text = parts[1] if len(parts) > 1 else "Basic response without research"
                     trade_offs = ["No research performed"]
                     confidence_score = 0.7
@@ -179,21 +181,55 @@ class OpenRouterClient:
             # Handle tool calls
             while response.choices[0].message.tool_calls:
                 assistant_message = response.choices[0].message
-                messages.append(assistant_message)
+                # Create proper assistant message dict
+                assistant_msg: ChatCompletionMessageParam = {
+                    "role": "assistant",
+                    "content": assistant_message.content or ""
+                }
+                # Add tool_calls if present, converting to proper format
+                if assistant_message.tool_calls:
+                    tool_calls_param = []
+                    for tc in assistant_message.tool_calls:
+                        function_obj = getattr(tc, 'function', None)
+                        if function_obj:
+                            tool_calls_param.append({
+                                "id": getattr(tc, 'id', ''),
+                                "type": "function",
+                                "function": {
+                                    "name": getattr(function_obj, 'name', 'unknown'),
+                                    "arguments": getattr(function_obj, 'arguments', '{}')
+                                }
+                            })
+                    assistant_msg["tool_calls"] = tool_calls_param
+                messages.append(assistant_msg)
 
-                for tool_call in assistant_message.tool_calls:
-                    print(f"  🔍 {model_name} researching: {tool_call.function.name}")
-                    research_steps.append({
-                        "function": tool_call.function.name,
-                        "arguments": tool_call.function.arguments
-                    })
+                for tool_call in (assistant_message.tool_calls or []):
+                    # Use getattr for safe attribute access
+                    function_obj = getattr(tool_call, 'function', None)
+                    if function_obj:
+                        function_name = getattr(function_obj, 'name', 'unknown')
+                        function_args = getattr(function_obj, 'arguments', '{}')
 
-                    tool_result = self.execute_tool_call(tool_call)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": tool_result
-                    })
+                        print(f"  🔍 {model_name} researching: {function_name}")
+                        research_steps.append({
+                            "function": function_name,
+                            "arguments": function_args
+                        })
+
+                        try:
+                            tool_result = self.execute_tool_call(tool_call)
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": tool_result
+                            })
+                        except Exception as tool_error:
+                            print(f"  ❌ {model_name} tool execution failed: {tool_error}")
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": f"Error: {str(tool_error)}"
+                            })
 
                 # Get next response
                 response = self.client.chat.completions.create(
@@ -207,10 +243,40 @@ class OpenRouterClient:
             response_time = time.time() - start_time
             content = response.choices[0].message.content
 
-            # v0.5: Simple parsing (keep original logic)
-            parts = content.split('\n\n', 2)
-            recommendation = parts[0] if parts else content[:200]
-            reasoning_text = parts[1] if len(parts) > 1 else "See full response"
+            # v0.5: Better parsing with validation and logging
+            if not content or content.strip() == "":
+                print(f"  ⚠️  {model_name} returned empty content (research steps: {len(research_steps)}, time: {response_time:.2f}s)")
+                return ModelResponse(
+                    model_name=model_name,
+                    team="competitor",
+                    recommendation="Error: Empty response",
+                    reasoning=f"Model returned empty content after {len(research_steps)} research steps in {response_time:.2f}s",
+                    trade_offs=[],
+                    confidence_score=0.0,
+                    response_time=response_time,
+                    success=False,
+                    research_steps=research_steps
+                )
+
+            # Improved parsing for various response formats
+            content_clean = content.strip()
+
+            # Try to find "Final Recommendation:" pattern
+            final_recommendation_match = re.search(r'Final Recommendation:\s*(.*?)(?:\n|$)', content_clean, re.DOTALL)
+            if final_recommendation_match:
+                recommendation = f"Final Recommendation: {final_recommendation_match.group(1).strip()}"
+            else:
+                # Fallback: use first meaningful line or first 200 chars
+                lines = [line.strip() for line in content_clean.split('\n') if line.strip()]
+                recommendation = lines[0] if lines else content_clean[:200]
+                print(f"  🔧 {model_name} using fallback parsing (no 'Final Recommendation:' found)")
+                if len(content_clean) < 200:
+                    print(f"  📝 {model_name} short response ({len(content_clean)} chars): {repr(content_clean[:100])}")
+
+            # Extract reasoning - look for patterns or use remaining content
+            reasoning_parts = content_clean.split('\n\n')
+            reasoning_text = reasoning_parts[1] if len(reasoning_parts) > 1 else "Analysis based on research"
+
             trade_offs = ["Analysis based on research"]
             confidence_score = 0.8
 
@@ -227,6 +293,15 @@ class OpenRouterClient:
 
         except Exception as e:
             print(f"❌ Error with {model_name}: {str(e)}")
+            print(f"  🔍 Exception type: {type(e).__name__}")
+            # Check for HTTP response attributes more carefully
+            try:
+                if hasattr(e, 'response') and getattr(e, 'response', None):
+                    response_obj = getattr(e, 'response')
+                    print(f"  🔍 HTTP status: {getattr(response_obj, 'status_code', 'unknown')}")
+                    print(f"  🔍 Response text: {getattr(response_obj, 'text', 'unknown')[:200]}")
+            except Exception:
+                pass  # Don't fail on logging errors
             return ModelResponse(
                 model_name=model_name,
                 team="competitor",
