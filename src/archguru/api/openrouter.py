@@ -4,9 +4,15 @@ Handles LLM requests with research tool access
 """
 import asyncio
 import json
-from typing import List, Dict, Any
+from typing import List, Optional
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam, ChatCompletionToolParam
 from ..core.config import Config
+from ..core.constants import (
+    MODEL_MAX_TOKENS, MODEL_TEMPERATURE,
+    DEFAULT_TOOL_RESULTS, MAX_TOOL_RESULTS
+)
+from ..core.response_parser import ResponseParser
 from ..models.decision import ModelResponse
 from .github import GitHubClient
 from .reddit import RedditClient
@@ -18,16 +24,16 @@ STRICT_OUTPUT_FORMAT = """OUTPUT FORMAT (STRICT):
 Final Recommendation: <one concise sentence>
 
 Reasoning:
-- <3–6 bullets, ≤12 words each>
+- <3-6 bullets, ≤12 words each>
 
 Trade-offs:
-- <2–5 bullets, name the axis>
+- <2-5 bullets, name the axis>
 
 Implementation Steps:
-- <3–7 bullets, concrete>
+- <3-7 bullets, concrete>
 
 Evidence:
-- <0–5 GitHub links or repo names only>"""
+- <0-5 GitHub links or repo names only>"""
 
 
 class OpenRouterClient:
@@ -46,8 +52,9 @@ class OpenRouterClient:
         self.github = GitHubClient()
         self.reddit = RedditClient()
         self.stackoverflow = StackOverflowClient()
+        self.parser = ResponseParser()
 
-    def get_research_tools(self) -> List[Dict[str, Any]]:
+    def get_research_tools(self) -> List[ChatCompletionToolParam]:
         """Define available research tools for the LLM"""
         return [
             {
@@ -60,7 +67,7 @@ class OpenRouterClient:
                         "properties": {
                             "query": {"type": "string", "description": "Search query"},
                             "language": {"type": "string", "description": "Programming language filter"},
-                            "limit": {"type": "integer", "description": "Number of results (max 10)", "default": 5}
+                            "limit": {"type": "integer", "description": f"Number of results (max {MAX_TOOL_RESULTS})", "default": DEFAULT_TOOL_RESULTS}
                         },
                         "required": ["query"]
                     }
@@ -76,7 +83,7 @@ class OpenRouterClient:
                         "properties": {
                             "query": {"type": "string", "description": "Search query"},
                             "subreddits": {"type": "array", "items": {"type": "string"}, "description": "Specific subreddits to search"},
-                            "limit": {"type": "integer", "description": "Number of results (max 10)", "default": 5}
+                            "limit": {"type": "integer", "description": f"Number of results (max {MAX_TOOL_RESULTS})", "default": DEFAULT_TOOL_RESULTS}
                         },
                         "required": ["query"]
                     }
@@ -92,7 +99,7 @@ class OpenRouterClient:
                         "properties": {
                             "query": {"type": "string", "description": "Search query"},
                             "tags": {"type": "array", "items": {"type": "string"}, "description": "Technology tags to filter by"},
-                            "limit": {"type": "integer", "description": "Number of results (max 10)", "default": 5}
+                            "limit": {"type": "integer", "description": f"Number of results (max {MAX_TOOL_RESULTS})", "default": DEFAULT_TOOL_RESULTS}
                         },
                         "required": ["query"]
                     }
@@ -104,6 +111,10 @@ class OpenRouterClient:
         """Execute a tool call and return results"""
         function_name = tool_call.function.name
         arguments = json.loads(tool_call.function.arguments)
+
+        # Clamp limit to MAX_TOOL_RESULTS
+        if 'limit' in arguments:
+            arguments['limit'] = min(arguments['limit'], MAX_TOOL_RESULTS)
 
         try:
             if function_name == "search_github_repos":
@@ -130,17 +141,17 @@ class OpenRouterClient:
         research_steps = []
 
         try:
-            messages = [{"role": "user", "content": prompt}]
+            messages: List[ChatCompletionMessageParam] = [{"role": "user", "content": prompt}]
             tools = self.get_research_tools()
 
-            # Try initial request with tools
+            # Try initial request with tools using constants
             try:
                 response = self.client.chat.completions.create(
                     model=model_name,
                     messages=messages,
                     tools=tools,
-                    max_tokens=2000,
-                    temperature=0.7
+                    max_tokens=MODEL_MAX_TOKENS,
+                    temperature=MODEL_TEMPERATURE
                 )
             except Exception as tool_error:
                 # If tools fail (404/400), fallback to simple completion
@@ -149,27 +160,23 @@ class OpenRouterClient:
                     response = self.client.chat.completions.create(
                         model=model_name,
                         messages=messages,
-                        max_tokens=2000,
-                        temperature=0.7
+                        max_tokens=MODEL_MAX_TOKENS,
+                        temperature=MODEL_TEMPERATURE
                     )
                     # Return basic response without research
                     response_time = time.time() - start_time
                     content = response.choices[0].message.content
                     
-                    # v0.5: Simple parsing (keep original logic)
-                    parts = content.split('\n\n', 2)
-                    recommendation = parts[0] if parts else content[:200]
-                    reasoning_text = parts[1] if len(parts) > 1 else "Basic response without research"
-                    trade_offs = ["No research performed"]
-                    confidence_score = 0.7
-
+                    # Use parser for consistency
+                    parsed = self.parser.parse_model_response(content or "")
+                    
                     return ModelResponse(
                         model_name=model_name,
                         team="basic",
-                        recommendation=recommendation,
-                        reasoning=reasoning_text,
-                        trade_offs=trade_offs,
-                        confidence_score=confidence_score,
+                        recommendation=parsed.recommendation,
+                        reasoning=parsed.reasoning,
+                        trade_offs=parsed.trade_offs if parsed.trade_offs else ["No research performed"],
+                        confidence_score=0.7,
                         response_time=response_time,
                         research_steps=[]
                     )
@@ -179,69 +186,176 @@ class OpenRouterClient:
             # Handle tool calls
             while response.choices[0].message.tool_calls:
                 assistant_message = response.choices[0].message
-                messages.append(assistant_message)
+                # Create proper assistant message dict
+                assistant_msg: ChatCompletionMessageParam = {
+                    "role": "assistant",
+                    "content": assistant_message.content or ""
+                }
+                # Add tool_calls if present, converting to proper format
+                if assistant_message.tool_calls:
+                    tool_calls_param = []
+                    for tc in assistant_message.tool_calls:
+                        function_obj = getattr(tc, 'function', None)
+                        if function_obj:
+                            tool_calls_param.append({
+                                "id": getattr(tc, 'id', ''),
+                                "type": "function",
+                                "function": {
+                                    "name": getattr(function_obj, 'name', 'unknown'),
+                                    "arguments": getattr(function_obj, 'arguments', '{}')
+                                }
+                            })
+                    assistant_msg["tool_calls"] = tool_calls_param
+                messages.append(assistant_msg)
 
-                for tool_call in assistant_message.tool_calls:
-                    print(f"  🔍 {model_name} researching: {tool_call.function.name}")
-                    research_steps.append({
-                        "function": tool_call.function.name,
-                        "arguments": tool_call.function.arguments
-                    })
+                for tool_call in (assistant_message.tool_calls or []):
+                    # Use getattr for safe attribute access
+                    function_obj = getattr(tool_call, 'function', None)
+                    if function_obj:
+                        function_name = getattr(function_obj, 'name', 'unknown')
+                        function_args = getattr(function_obj, 'arguments', '{}')
 
-                    tool_result = self.execute_tool_call(tool_call)
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": tool_result
-                    })
+                        print(f"  🔍 {model_name} researching: {function_name}")
+                        research_steps.append({
+                            "function": function_name,
+                            "arguments": function_args
+                        })
+
+                        try:
+                            tool_result = self.execute_tool_call(tool_call)
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": tool_result
+                            })
+                        except Exception as tool_error:
+                            print(f"  ❌ {model_name} tool execution failed: {tool_error}")
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": f"Error: {str(tool_error)}"
+                            })
 
                 # Get next response
                 response = self.client.chat.completions.create(
                     model=model_name,
                     messages=messages,
                     tools=tools,
-                    max_tokens=2000,
-                    temperature=0.7
+                    max_tokens=MODEL_MAX_TOKENS,
+                    temperature=MODEL_TEMPERATURE
                 )
 
             response_time = time.time() - start_time
             content = response.choices[0].message.content
 
-            # v0.5: Simple parsing (keep original logic)
-            parts = content.split('\n\n', 2)
-            recommendation = parts[0] if parts else content[:200]
-            reasoning_text = parts[1] if len(parts) > 1 else "See full response"
-            trade_offs = ["Analysis based on research"]
-            confidence_score = 0.8
+            # Track if model skipped research tools (for performance metrics)
+            skipped_research = len(research_steps) == 0 and "research" in prompt.lower()
+            if skipped_research:
+                # Check response object for token usage info
+                response_info = ""
+                if hasattr(response, 'usage'):
+                    usage = getattr(response, 'usage', None)
+                    if usage:
+                        prompt_tokens = getattr(usage, 'prompt_tokens', 0)
+                        completion_tokens = getattr(usage, 'completion_tokens', 0)
+                        response_info = f" (tokens: {prompt_tokens}→{completion_tokens})"
+
+                print(f"  ⚠️  {model_name} skipped research tools (time: {response_time:.2f}s){response_info}")
+                if content:
+                    print(f"      Response preview: {content[:150].strip() if content else ''}...")
+                # Continue to allow the response but mark it for lower scoring
+
+            # Use parser for consistency
+            if not content or content.strip() == "":
+                print(f"  ⚠️  {model_name} returned empty content (research steps: {len(research_steps)}, time: {response_time:.2f}s)")
+                return ModelResponse(
+                    model_name=model_name,
+                    team="competitor",
+                    recommendation="Error: Empty response",
+                    reasoning=f"Model returned empty content after {len(research_steps)} research steps in {response_time:.2f}s",
+                    trade_offs=[],
+                    confidence_score=0.0,
+                    response_time=response_time,
+                    success=False,
+                    research_steps=research_steps
+                )
+
+            # Parse response using ResponseParser
+            parsed = self.parser.parse_model_response(content)
+
+            # Adjust confidence score based on research behavior
+            base_confidence = 0.8
+            if skipped_research:
+                base_confidence = 0.6  # Lower confidence for models that skip research
 
             return ModelResponse(
                 model_name=model_name,
                 team="competitor",
-                recommendation=recommendation,
-                reasoning=reasoning_text,
-                trade_offs=trade_offs,
-                confidence_score=confidence_score,
+                recommendation=parsed.recommendation,
+                reasoning=parsed.reasoning,
+                trade_offs=parsed.trade_offs if parsed.trade_offs else (["Analysis based on research"] if not skipped_research else ["Analysis without research"]),
+                confidence_score=base_confidence,
                 response_time=response_time,
-                research_steps=research_steps
+                research_steps=research_steps,
+                skipped_research=skipped_research
             )
 
         except Exception as e:
-            print(f"❌ Error with {model_name}: {str(e)}")
+            error_msg = str(e)
+            print(f"❌ Error with {model_name}: {error_msg}")
+            print(f"  🔍 Exception type: {type(e).__name__}")
+
+            # Extract detailed error information
+            detailed_error = error_msg
+
+            # Check for HTTP response attributes more carefully
+            try:
+                if hasattr(e, 'response') and getattr(e, 'response', None):
+                    response_obj = getattr(e, 'response')
+                    status_code = getattr(response_obj, 'status_code', 'unknown')
+                    response_text = getattr(response_obj, 'text', 'unknown')[:200]
+                    print(f"  🔍 HTTP status: {status_code}")
+                    print(f"  🔍 Response text: {response_text}")
+                    detailed_error = f"{error_msg} (HTTP {status_code}: {response_text})"
+
+                # Check for OpenAI-specific error details
+                if hasattr(e, 'body') and getattr(e, 'body', None):
+                    body = getattr(e, 'body')
+                    if isinstance(body, dict):
+                        error_info = body.get('error', {})
+                        if isinstance(error_info, dict):
+                            error_type = error_info.get('type', '')
+                            error_code = error_info.get('code', '')
+                            error_message = error_info.get('message', '')
+                            if error_message:
+                                print(f"  🔍 API error: {error_type} ({error_code}): {error_message}")
+                                detailed_error = f"{error_type}: {error_message}"
+
+                # Check for rate limiting or model availability issues
+                if "rate" in error_msg.lower():
+                    detailed_error = f"Rate limited: {error_msg}"
+                elif "model" in error_msg.lower() and ("not found" in error_msg.lower() or "unavailable" in error_msg.lower()):
+                    detailed_error = f"Model unavailable: {error_msg}"
+                elif "authentication" in error_msg.lower() or "unauthorized" in error_msg.lower():
+                    detailed_error = f"Authentication error: {error_msg}"
+
+            except Exception:
+                pass  # Don't fail on logging errors
             return ModelResponse(
                 model_name=model_name,
                 team="competitor",
-                recommendation=f"Error: {str(e)}",
-                reasoning="Model failed to respond",
+                recommendation=f"Error: {detailed_error}",
+                reasoning=f"Model failed to respond: {detailed_error}",
                 trade_offs=[],
                 confidence_score=0.0,
                 response_time=time.time() - start_time,
-                success=False,  # v0.4: Explicit failure flag
+                success=False,
                 research_steps=research_steps
             )
 
 
-    async def run_model_competition(self, decision_type: str, language: str = None,
-                                   framework: str = None, requirements: str = None) -> List[ModelResponse]:
+    async def run_model_competition(self, decision_type: str, language: Optional[str] = None,
+                                   framework: Optional[str] = None, requirements: Optional[str] = None) -> List[ModelResponse]:
         """Run multi-model team competition for Phase 2"""
         prompt = f"""You are an expert software architect competing with other AI models to provide the best architectural guidance. I need your help with an architectural decision.
 
@@ -280,19 +394,20 @@ Focus on practical, production-ready advice. Be confident and specific in your r
                 # Create error response for failed models
                 error_response = ModelResponse(
                     model_name=model_name,
-                    team="competitor",  # Simple team name since teams are eliminated
+                    team="competitor",
                     recommendation=f"Error: {str(response)}",
                     reasoning="Model failed to respond",
                     trade_offs=[],
                     confidence_score=0.0,
                     response_time=0.0,
-                    success=False,  # v0.4: Explicit failure flag
+                    success=False,
                     research_steps=[]
                 )
                 responses.append(error_response)
             else:
                 # Set simple team name for successful responses
-                response.team = "competitor"
-                responses.append(response)
+                if isinstance(response, ModelResponse):
+                    response.team = "competitor"
+                    responses.append(response)
 
         return responses

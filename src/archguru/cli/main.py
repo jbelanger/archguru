@@ -101,6 +101,7 @@ async def run_decision(args) -> int:
                     'response_time_sec': response.response_time,
                     'success': getattr(response, 'success', True),
                     'error': response.recommendation if not getattr(response, 'success', True) else None,
+                    'skipped_research': getattr(response, 'skipped_research', False),
                     'tool_calls': [
                         {
                             'function': step.get('function', ''),
@@ -112,6 +113,9 @@ async def run_decision(args) -> int:
                 }
                 model_responses_data.append(model_data)
 
+            # winner_source is already a string value from the pipeline
+            winner_source_value = result.winner_source if hasattr(result, 'winner_source') else None
+
             run_id = persist_pipeline_result(
                 decision_type=args.type,
                 language=args.language,
@@ -122,8 +126,9 @@ async def run_decision(args) -> int:
                 consensus_recommendation=result.consensus_recommendation,
                 debate_summary=result.debate_summary,
                 total_time_sec=total_time,
-                winning_model=result.winning_model,  # v0.4: Pass winner for Elo updates
-                winner_source=getattr(result, 'winner_source', None)  # v0.4: Pass selection method
+                winning_model=result.winning_model,
+                winner_source=winner_source_value,  # Fixed: pass string value
+                arbiter_evaluation=result.arbiter_evaluation  # Added: pass evaluation
             )
             print(f"\n💾 Run saved: {run_id}")
         except Exception as e:
@@ -173,8 +178,11 @@ async def _display_competition_results(result, verbose: bool = False):
         print(f"\n🎯 Individual Model Performance:")
         for i, response in enumerate(responses, 1):
             status = "✅" if getattr(response, 'success', True) else "❌"
+            research_info = f"{len(response.research_steps)} steps"
+            if getattr(response, 'skipped_research', False):
+                research_info += " ⚠️ skipped"
             print(f"  {i}. {status} {response.model_name} ({response.team})")
-            print(f"     Research: {len(response.research_steps)} steps")
+            print(f"     Research: {research_info}")
             print(f"     Time: {response.response_time:.2f}s")
             if not getattr(response, 'success', True):
                 print(f"     Error: {response.recommendation}")
@@ -184,7 +192,9 @@ async def _display_competition_results(result, verbose: bool = False):
             print(f"🥊 Debate Summary:")
             print(result.debate_summary)
 
-
+        if result.arbiter_evaluation:
+            print(f"\n📊 Arbiter Evaluation:")
+            print(result.arbiter_evaluation)
 
 
 async def show_stats() -> int:

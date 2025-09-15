@@ -13,7 +13,7 @@ class DecisionRequest:
     language: Optional[str] = None
     framework: Optional[str] = None
     requirements: Optional[str] = None
-    timestamp: datetime = None
+    timestamp: Optional[datetime] = None
 
     def __post_init__(self):
         if self.timestamp is None:
@@ -31,8 +31,9 @@ class ModelResponse:
     confidence_score: float
     response_time: float
     success: bool = True  # v0.4: Explicit success flag instead of checking "Error:" prefix
-    research_steps: List[Dict[str, Any]] = None
-    timestamp: datetime = None
+    research_steps: Optional[List[Dict[str, Any]]] = None
+    skipped_research: bool = False  # Track if model skipped expected research
+    timestamp: Optional[datetime] = None
 
     def __post_init__(self):
         if self.timestamp is None:
@@ -49,5 +50,6 @@ class DecisionResult:
     winning_model: Optional[str] = None
     consensus_recommendation: Optional[str] = None
     debate_summary: Optional[str] = None
+    arbiter_evaluation: Optional[str] = None  # v0.6: Detailed rubric evaluation
     total_time: Optional[float] = None
     winner_source: Optional[str] = None

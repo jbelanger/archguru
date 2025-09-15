@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS run (
   debate_summary TEXT,
   total_time_sec REAL,
   error TEXT,
+  arbiter_eval TEXT,  -- Added for v0.6 to store full arbiter evaluation
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -42,6 +43,7 @@ CREATE TABLE IF NOT EXISTS model_response (
   response_time_sec REAL,
   success BOOLEAN DEFAULT TRUE,
   error TEXT,
+  skipped_research BOOLEAN DEFAULT FALSE, -- Track if model skipped expected research
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

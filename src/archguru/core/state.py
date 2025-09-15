@@ -11,5 +11,8 @@ class CompetitionState(TypedDict):
     model_responses: List[ModelResponse]
     winning_model: Optional[str]
     consensus_recommendation: Optional[str]
+    debate_summary: Optional[str]
+    arbiter_evaluation: Optional[str]
+    winner_source: Optional[str]
     error_message: Optional[str]
     current_step: str

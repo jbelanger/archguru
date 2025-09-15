@@ -23,8 +23,9 @@ class RunResult:
     consensus_recommendation: Optional[str]
     debate_summary: Optional[str]
     total_time_sec: float
-    winning_model: Optional[str] = None  # v0.4: Track winner for Elo updates
-    winner_source: Optional[str] = None  # v0.4: Track selection method (arbiter/fallback)
+    winning_model: Optional[str] = None
+    winner_source: Optional[str] = None
+    arbiter_evaluation: Optional[str] = None  # Added: store evaluation
     error: Optional[str] = None
 
 
@@ -33,9 +34,9 @@ class ArchGuruRepo:
 
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
-            db_path = Path.home() / ".archguru" / "archguru.db"
-
-        self.db_path = Path(db_path)
+            self.db_path = Path.home() / ".archguru" / "archguru.db"
+        else:
+            self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
@@ -47,6 +48,30 @@ class ArchGuruRepo:
 
         with sqlite3.connect(self.db_path) as conn:
             conn.executescript(schema)
+            # Apply migration if needed
+            self._apply_migrations(conn)
+
+    def _apply_migrations(self, conn: sqlite3.Connection):
+        """Apply database migrations"""
+        # Check if arbiter_eval column exists
+        cursor = conn.execute("""
+            SELECT COUNT(*) FROM pragma_table_info('run')
+            WHERE name='arbiter_eval'
+        """)
+        if cursor.fetchone()[0] == 0:
+            # Add arbiter_eval column
+            conn.execute("ALTER TABLE run ADD COLUMN arbiter_eval TEXT")
+            print("  📦 Applied migration: added arbiter_eval column")
+
+        # Check if skipped_research column exists
+        cursor = conn.execute("""
+            SELECT COUNT(*) FROM pragma_table_info('model_response')
+            WHERE name='skipped_research'
+        """)
+        if cursor.fetchone()[0] == 0:
+            # Add skipped_research column
+            conn.execute("ALTER TABLE model_response ADD COLUMN skipped_research BOOLEAN DEFAULT FALSE")
+            print("  📦 Applied migration: added skipped_research column")
 
     def _get_or_create_model(self, conn: sqlite3.Connection, model_name: str) -> int:
         """Get or create model record, return model_id"""
@@ -63,7 +88,7 @@ class ArchGuruRepo:
             "INSERT INTO model (name, provider) VALUES (?, ?)",
             (model_name, provider)
         )
-        return cursor.lastrowid
+        return cursor.lastrowid or 0
 
     def _get_decision_type_id(self, conn: sqlite3.Connection, decision_type: str) -> int:
         """Get decision_type_id, create if doesn't exist"""
@@ -77,7 +102,7 @@ class ArchGuruRepo:
             "INSERT INTO decision_type (key, label) VALUES (?, ?)",
             (decision_type, decision_type.replace('-', ' ').title())
         )
-        return cursor.lastrowid
+        return cursor.lastrowid or 0
 
     def persist_run_result(
         self,
@@ -95,18 +120,18 @@ class ArchGuruRepo:
             decision_type_id = self._get_decision_type_id(conn, result.decision_type)
             arbiter_model_id = self._get_or_create_model(conn, result.arbiter_model)
 
-            # Insert run record
+            # Insert run record with arbiter_eval
             conn.execute("""
                 INSERT INTO run (
                     id, decision_type_id, language, framework, requirements,
                     prompt_version, arbiter_model_id, consensus_reco, debate_summary,
-                    total_time_sec, error
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    total_time_sec, error, arbiter_eval
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 run_id, decision_type_id, result.language, result.framework,
                 result.requirements, prompt_version, arbiter_model_id,
                 result.consensus_recommendation, result.debate_summary,
-                result.total_time_sec, result.error
+                result.total_time_sec, result.error, result.arbiter_evaluation
             ))
 
             # Insert model responses
@@ -117,14 +142,15 @@ class ArchGuruRepo:
                 conn.execute("""
                     INSERT INTO model_response (
                         id, run_id, model_id, team, recommendation, reasoning,
-                        trade_offs, confidence_score, response_time_sec, success, error
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        trade_offs, confidence_score, response_time_sec, success, error, skipped_research
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     response_id, run_id, model_id, response.get('team'),
                     response.get('recommendation'), response.get('reasoning'),
                     json.dumps(response.get('trade_offs', [])),
                     response.get('confidence_score'), response.get('response_time_sec'),
-                    response.get('success', True), response.get('error')
+                    response.get('success', True), response.get('error'),
+                    response.get('skipped_research', False)
                 ))
 
                 # Insert tool calls if present
@@ -148,12 +174,14 @@ class ArchGuruRepo:
                         self._update_elo_ratings_for_winner(
                             conn, run_id, result.winning_model,
                             result.model_responses, decision_type_id, arbiter_model_id,
-                            result.winner_source
+                            result.winner_source, result.arbiter_evaluation
                         )
                     except Exception as e:
                         print(f"Warning: Failed to update Elo ratings: {str(e)}")
                 else:
                     print("ℹ️  Skipping Elo: no valid winner in this run")
+            else:
+                print("ℹ️  Skipping Elo: no winning_model set")
 
         return run_id
 
@@ -165,9 +193,13 @@ class ArchGuruRepo:
         model_responses: List[Dict[str, Any]],
         decision_type_id: int,
         judge_model_id: int,
-        winner_source: Optional[str] = None
+        winner_source: Optional[str] = None,
+        arbiter_evaluation: Optional[str] = None
     ):
         """Update Elo ratings when arbiter selects a winner"""
+        # winner_source is already a string value from the pipeline
+        source = winner_source
+        
         # Get winner model ID
         winner_model_id = self._get_or_create_model(conn, winning_model_name)
 
@@ -181,15 +213,55 @@ class ArchGuruRepo:
                 loser_model_ids.append(loser_id)
 
         if loser_model_ids:
-            # Set reason based on winner source
-            reason = "Arbiter selection" if winner_source == "arbiter" else "Fallback scoring"
+            # Create detailed reason based on winner source and evaluation
+            if source == "arbiter" and arbiter_evaluation:
+                # Extract condensed reasoning from the rubric evaluation
+                reason = self._extract_pairwise_reason(arbiter_evaluation, winning_model_name)
+            else:
+                reason = "Arbiter selection" if source == "arbiter" else "Fallback scoring"
 
             # Update Elo ratings for all pairwise comparisons
             updates = update_elo_ratings_for_run(
                 conn, run_id, winner_model_id, loser_model_ids,
                 decision_type_id, judge_model_id, reason
             )
-            print(f"  📊 Updated Elo ratings: {len(updates)} pairwise comparisons ({reason})")
+            print(f"  📊 Updated Elo ratings: {len(updates)} pairwise comparisons ({reason[:50]}...)")
+
+    def _extract_pairwise_reason(self, arbiter_evaluation: str, winning_model_name: str) -> str:
+        """Extract condensed reasoning from arbiter evaluation for pairwise judgment"""
+        if not arbiter_evaluation:
+            return "Arbiter selection"
+
+        # Look for winner reasoning section first
+        if "WINNER REASONING:" in arbiter_evaluation:
+            lines = arbiter_evaluation.split('\n')
+            winner_reasoning = []
+            in_winner_section = False
+
+            for line in lines:
+                line = line.strip()
+                if line.startswith("WINNER REASONING:"):
+                    in_winner_section = True
+                    continue
+                elif line.startswith("RUBRIC SCORING:") or line.startswith("CONSENSUS") or line.startswith("DEBATE"):
+                    in_winner_section = False
+                elif in_winner_section and line:
+                    winner_reasoning.append(line)
+
+            if winner_reasoning:
+                # Take first sentence and limit to 200 chars for database storage
+                reason = ' '.join(winner_reasoning)[:200]
+                return reason if reason else "Arbiter selection with structured evaluation"
+
+        # Fallback: try to find any meaningful assessment
+        lines = arbiter_evaluation.split('\n')
+        for line in lines:
+            line = line.strip()
+            if (winning_model_name.lower() in line.lower() and
+                any(word in line.lower() for word in ['better', 'superior', 'stronger', 'clearer', 'more', 'best'])):
+                return line[:200]
+
+        return "Arbiter selection with structured evaluation"
 
     def get_stats(self) -> Dict[str, Any]:
         """Get basic statistics for --stats command"""
@@ -252,8 +324,9 @@ def persist_pipeline_result(
     consensus_recommendation: Optional[str],
     debate_summary: Optional[str],
     total_time_sec: float,
-    winning_model: Optional[str] = None,  # v0.4: Track winner for Elo
-    winner_source: Optional[str] = None,  # v0.4: Track selection method
+    winning_model: Optional[str] = None,
+    winner_source: Optional[str] = None,
+    arbiter_evaluation: Optional[str] = None,  # Added parameter
     prompt_version: str = "1.0",
     db_path: Optional[str] = None
 ) -> str:
@@ -269,8 +342,9 @@ def persist_pipeline_result(
         consensus_recommendation=consensus_recommendation,
         debate_summary=debate_summary,
         total_time_sec=total_time_sec,
-        winning_model=winning_model,  # v0.4: Include winner for Elo
-        winner_source=winner_source   # v0.4: Include selection method
+        winning_model=winning_model,
+        winner_source=winner_source,
+        arbiter_evaluation=arbiter_evaluation  # Added field
     )
 
     repo = ArchGuruRepo(db_path)
