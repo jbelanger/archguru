@@ -18,16 +18,16 @@ class Config:
     # Model teams for competition (configurable via environment variables)
     DEFAULT_MODEL_TEAMS = {
         "team_a": [
-            "openai/gpt-4o",
-            "openai/gpt-4o-mini"
+            "openai/gpt-oss-120b",
+            "openai/gpt-5-nano"
         ],
         "team_b": [
-            "anthropic/claude-3.5-sonnet",
-            "anthropic/claude-3-haiku"
+            "qwen/qwen3-next-80b-a3b-thinking",
+            "qwen/qwen3-next-80b-a3b-instruct"
         ],
         "team_c": [
-            "meta-llama/llama-3.2-3b-instruct",
-            "meta-llama/llama-3.1-8b-instruct"
+            "openrouter/sonoma-dusk-alpha",
+            "openrouter/sonoma-sky-alpha"
         ]
     }
 

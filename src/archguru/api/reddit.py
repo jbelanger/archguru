@@ -24,8 +24,13 @@ class RedditClient:
 
         results = []
 
-        for subreddit in subreddits[:3]:  # Limit to avoid rate limits
+        for subreddit_raw in subreddits[:3]:  # Limit to avoid rate limits
             try:
+                # Clean subreddit name - remove any r/ prefix and extra slashes
+                subreddit = subreddit_raw.strip().replace("r/", "").replace("/", "")
+                if not subreddit:
+                    continue
+
                 params = {
                     "q": query,
                     "limit": limit,
@@ -35,7 +40,8 @@ class RedditClient:
 
                 response = self.session.get(
                     f"{self.base_url}/r/{subreddit}/search.json",
-                    params=params
+                    params=params,
+                    timeout=8
                 )
                 response.raise_for_status()
 
@@ -68,7 +74,8 @@ class RedditClient:
 
             response = self.session.get(
                 f"{self.base_url}/r/{subreddit}/top.json",
-                params=params
+                params=params,
+                timeout=8
             )
             response.raise_for_status()
 

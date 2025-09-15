@@ -29,7 +29,7 @@ class GitHubClient:
         }
 
         try:
-            response = self.session.get(f"{self.base_url}/search/repositories", params=params)
+            response = self.session.get(f"{self.base_url}/search/repositories", params=params, timeout=8)
             response.raise_for_status()
 
             results = []
@@ -51,7 +51,7 @@ class GitHubClient:
     def get_repository_structure(self, owner: str, repo: str) -> Dict[str, Any]:
         """Get repository file structure"""
         try:
-            response = self.session.get(f"{self.base_url}/repos/{owner}/{repo}/contents")
+            response = self.session.get(f"{self.base_url}/repos/{owner}/{repo}/contents", timeout=8)
             response.raise_for_status()
 
             structure = []

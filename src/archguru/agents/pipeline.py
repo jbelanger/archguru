@@ -1,6 +1,6 @@
 """
-LangGraph pipeline for single model autonomous research
-v0.1: Single model with research tools
+LangGraph pipeline for model team competition and debate
+Phase 2: Multi-model competition with cross-model debate
 """
 import asyncio
 from typing import Dict, Any
@@ -8,38 +8,43 @@ from langgraph.graph import StateGraph, END
 from ..core.state import CompetitionState
 from ..models.decision import DecisionRequest, DecisionResult
 from ..api.openrouter import OpenRouterClient
+from .debate import ModelDebateEngine
 
 
-class ModelResearchPipeline:
-    """LangGraph pipeline for single model autonomous research"""
+class ModelCompetitionPipeline:
+    """LangGraph pipeline for multi-model team competition"""
 
     def __init__(self):
         self.client = OpenRouterClient()
+        self.debate_engine = ModelDebateEngine()
         self.graph = self._build_graph()
 
     def _build_graph(self) -> StateGraph:
-        """Build the LangGraph research pipeline"""
+        """Build the LangGraph competition pipeline"""
         workflow = StateGraph(CompetitionState)
 
-        # Add nodes for v0.1 single model research
-        workflow.add_node("run_research", self._run_research)
-        workflow.add_node("generate_result", self._generate_result)
+        # Phase 2: Multi-model competition
+        workflow.add_node("run_model_competition", self._run_model_competition)
+        workflow.add_node("run_debate", self._run_debate)
+        workflow.add_node("generate_final_result", self._generate_final_result)
 
         # Set entry point
-        workflow.set_entry_point("run_research")
+        workflow.set_entry_point("run_model_competition")
 
         # Add edges
-        workflow.add_edge("run_research", "generate_result")
-        workflow.add_edge("generate_result", END)
+        workflow.add_edge("run_model_competition", "run_debate")
+        workflow.add_edge("run_debate", "generate_final_result")
+        workflow.add_edge("generate_final_result", END)
 
         return workflow.compile()
 
-    async def _run_research(self, state: CompetitionState) -> Dict[str, Any]:
-        """Run single model autonomous research"""
+
+    async def _run_model_competition(self, state: CompetitionState) -> Dict[str, Any]:
+        """Run multi-model team competition"""
         request = state["request"]
 
         try:
-            response = await self.client.run_single_model_research(
+            responses = await self.client.run_model_team_competition(
                 decision_type=request.decision_type,
                 language=request.language,
                 framework=request.framework,
@@ -47,38 +52,65 @@ class ModelResearchPipeline:
             )
 
             return {
-                "model_responses": [response],
-                "current_step": "research_complete"
+                "model_responses": responses,
+                "current_step": "competition_complete"
             }
 
         except Exception as e:
             return {
-                "error_message": f"Research failed: {str(e)}",
+                "error_message": f"Model competition failed: {str(e)}",
                 "current_step": "error"
             }
 
-    async def _generate_result(self, state: CompetitionState) -> Dict[str, Any]:
-        """Generate final result from research"""
+    async def _run_debate(self, state: CompetitionState) -> Dict[str, Any]:
+        """Run cross-model debate and evaluation"""
         responses = state["model_responses"]
 
-        if responses and len(responses) > 0:
-            response = responses[0]
-            if not response.recommendation.startswith("Error:"):
-                research_summary = f"Research completed using {len(response.research_steps)} tool calls"
-                return {
-                    "consensus_recommendation": response.recommendation,
-                    "debate_summary": research_summary,
-                    "current_step": "complete"
-                }
+        if not responses:
+            return {
+                "error_message": "No model responses to debate",
+                "current_step": "error"
+            }
 
-        return {
-            "consensus_recommendation": "Research failed to produce recommendations",
-            "debate_summary": "No research completed",
-            "current_step": "complete"
-        }
+        try:
+            debate_result = await self.debate_engine.run_cross_model_debate(responses)
+
+            return {
+                "winning_model": debate_result["winning_model"],
+                "consensus_recommendation": debate_result["consensus_recommendation"],
+                "debate_summary": debate_result["debate_summary"],
+                "arbiter_evaluation": debate_result.get("arbiter_evaluation"),
+                "current_step": "debate_complete"
+            }
+
+        except Exception as e:
+            return {
+                "error_message": f"Debate failed: {str(e)}",
+                "current_step": "error"
+            }
+
+    async def _generate_final_result(self, state: CompetitionState) -> Dict[str, Any]:
+        """Generate final competition result"""
+        responses = state["model_responses"]
+        winning_model = state.get("winning_model")
+        consensus = state.get("consensus_recommendation")
+
+        if responses and winning_model and consensus:
+            successful_models = [r for r in responses if not r.recommendation.startswith("Error:")]
+            return {
+                "consensus_recommendation": consensus,
+                "debate_summary": f"Competition complete: {len(successful_models)}/{len(responses)} models succeeded. Winner: {winning_model}",
+                "current_step": "complete"
+            }
+        else:
+            return {
+                "consensus_recommendation": "Competition failed to produce results",
+                "debate_summary": "Model competition encountered errors",
+                "current_step": "complete"
+            }
 
     async def run(self, request: DecisionRequest) -> DecisionResult:
-        """Run the complete research pipeline"""
+        """Run the complete competition pipeline"""
         initial_state: CompetitionState = {
             "request": request,
             "model_responses": [],
@@ -88,13 +120,13 @@ class ModelResearchPipeline:
             "current_step": "starting"
         }
 
-        print("🔄 Starting LangGraph research pipeline...")
+        print("🔄 Starting LangGraph model competition pipeline...")
         result = await self.graph.ainvoke(initial_state)
 
         return DecisionResult(
             request=request,
             model_responses=result.get("model_responses", []),
-            winning_model=result.get("model_responses", [None])[0].model_name if result.get("model_responses") else None,
+            winning_model=result.get("winning_model"),
             consensus_recommendation=result.get("consensus_recommendation"),
-            debate_summary=result.get("debate_summary", "Single model research complete")
+            debate_summary=result.get("debate_summary", "Competition complete")
         )

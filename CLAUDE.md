@@ -40,32 +40,36 @@ A CLI platform (`archguru`) where AI model teams compete:
 9. **Interface**: Rich CLI + Web dashboard + API endpoints
 10. **Cost Optimization**: Balance model quality with API costs across multiple models
 
-## Development Approach: Iterative MVP Releases
+## Development Approach: Clean State Phases
 
-**Strategic Product Development** with "Real Product Evolution" methodology:
+**Clean Development Methodology** with "Phase Reset" approach:
 
-- Each release adds features to the same codebase in `src/`
-- Single `archguru` CLI that grows more sophisticated each release
-- No separate prototype files - everything builds on the real product
-- Version tags (v0.1 → v1.4) track progress through git commits
-- Professional development through actual production implementation
+- Each phase is a complete rewrite/rebuild of the codebase in `src/`
+- NO legacy compatibility or backward support between phases
+- Each phase starts fresh with current requirements only
+- No "v0.1 compatibility mode" or legacy code paths
+- Clean, focused implementation for each phase's goals
+- Version tags (Phase 1 → Phase 2 → Phase 3) track major rebuilds
+- Professional development through clean architecture at each phase
 
-## Current Status
+## Current Status - Phase 2
 
 - ✅ Project setup (uv + Python 3.13)
 - ✅ ADR v3.0 created (`docs/adr-001-architecture.md`) - Universal Architecture Decision Platform
-- ✅ Product roadmap created (`docs/roadmap.md`) - Strategic development plan with 14 releases
-- ✅ Architecture pivoted from individual agents to model team competition
-- ✅ OpenRouter dependencies added (openai, python-dotenv)
-- ✅ Learning chapters 1-7 completed (foundational LangGraph concepts)
-- ⏳ Ready to start building real MVP with OpenRouter model competition
+- ✅ Product roadmap created (`docs/roadmap.md`) - Strategic development plan
+- ✅ **Phase 2 Complete**: Multi-model team competition with cross-model debate
+- ✅ OpenRouter dependencies added (openai, python-dotenv, langgraph)
+- ✅ LangGraph pipeline for model competition
+- ✅ Cross-model debate engine with arbiter evaluation
+- ✅ Clean CLI implementation (no legacy compatibility)
 
 ## Development Commands
 
 ```bash
-# Run the main CLI (the real product)
+# Run the Phase 2 CLI (model competition)
 uv run archguru --help
 uv run archguru --type project-structure --language python --framework web
+uv run archguru --type database --language python --verbose
 
 # Development/testing
 uv run python -m src.archguru.cli.main --help
@@ -79,9 +83,9 @@ uv add --dev package-name
 # Check Python version
 uv run python --version  # Should show 3.13.x
 
-# Tag versions as we build
-git tag v0.1  # After Chapter 1
-git tag v0.2  # After Chapter 2, etc.
+# Tag phases as we complete them
+git tag Phase-1  # Single model research
+git tag Phase-2  # Multi-model competition
 ```
 
 ## Environment Configuration
@@ -184,22 +188,22 @@ When resuming work:
 
 ## Remember for Future Sessions
 
-- **Single codebase evolution**: All chapters add to `src/` - no separate files
-- **Real product development**: Every commit makes `archguru` CLI more powerful
-- **Version tagging**: Track progress with git tags (v0.1, v0.2, etc.)
+- **Clean phase development**: Each phase is a fresh rebuild, no legacy compatibility
+- **Real product development**: Every phase makes `archguru` CLI more powerful
+- **Phase tagging**: Track major rebuilds with git tags (Phase-1, Phase-2, etc.)
 - **Production mindset**: Build something people will pay for, not just a tutorial
 - **Model competition focus**: Core value is comparing configurable OpenRouter models
-- **Iterative learning**: Learn LangGraph through real feature development
+- **Learning through building**: Learn LangGraph through real feature development
 
 ---
 
 ## Current Progress Summary
 
-- **Architecture Evolution**: Individual agents → Model team competition
-- **Development Approach**: Chapter files → Single iterative codebase in `src/`
-- **Product Vision**: Project structure tool → Universal architecture decision platform
-- **Learning Method**: Tutorial examples → Real production development
-- **Value Proposition**: LangGraph learning → Valuable product + deep technical skills
+- **Architecture**: Multi-model team competition with cross-model debate
+- **Development Approach**: Clean phase rebuilds in `src/` (no legacy compatibility)
+- **Product Vision**: Universal architecture decision platform with model competition
+- **Learning Method**: Real production development using LangGraph
+- **Value Proposition**: Valuable product + deep LangGraph technical skills
 
 _Last updated: 2025-09-15_
-_Current status: Ready to start iterative development of `archguru` CLI in `src/`_
+_Current status: **Phase 2 Complete** - Multi-model competition platform ready for testing_

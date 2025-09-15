@@ -90,3 +90,4 @@ node_modules/
 local_config.py
 local_settings.py
 settings_local.py
+commands.txt

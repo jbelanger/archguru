@@ -117,14 +117,44 @@ class OpenRouterClient:
             messages = [{"role": "user", "content": prompt}]
             tools = self.get_research_tools()
 
-            # Initial request with tools
-            response = self.client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                tools=tools,
-                max_tokens=2000,
-                temperature=0.7
-            )
+            # Try initial request with tools
+            try:
+                response = self.client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    tools=tools,
+                    max_tokens=2000,
+                    temperature=0.7
+                )
+            except Exception as tool_error:
+                # If tools fail (404/400), fallback to simple completion
+                if "tool" in str(tool_error).lower() or "404" in str(tool_error) or "400" in str(tool_error):
+                    print(f"  ⚠️  {model_name} doesn't support tools, using basic completion")
+                    response = self.client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        max_tokens=2000,
+                        temperature=0.7
+                    )
+                    # Return basic response without research
+                    response_time = time.time() - start_time
+                    content = response.choices[0].message.content
+                    parts = content.split('\n\n', 2)
+                    recommendation = parts[0] if parts else content[:200]
+                    reasoning = parts[1] if len(parts) > 1 else "Basic response without research"
+
+                    return ModelResponse(
+                        model_name=model_name,
+                        team="basic",
+                        recommendation=recommendation,
+                        reasoning=reasoning,
+                        trade_offs=["No research performed"],
+                        confidence_score=0.6,
+                        response_time=response_time,
+                        research_steps=[]
+                    )
+                else:
+                    raise tool_error
 
             # Handle tool calls
             while response.choices[0].message.tool_calls:
@@ -186,10 +216,11 @@ class OpenRouterClient:
                 research_steps=research_steps
             )
 
-    async def run_single_model_research(self, decision_type: str, language: str = None,
-                                       framework: str = None, requirements: str = None) -> ModelResponse:
-        """Run single model with autonomous research for v0.1"""
-        prompt = f"""You are an expert software architect. I need your help with an architectural decision.
+
+    async def run_model_team_competition(self, decision_type: str, language: str = None,
+                                       framework: str = None, requirements: str = None) -> List[ModelResponse]:
+        """Run multi-model team competition for Phase 2"""
+        prompt = f"""You are an expert software architect competing with other AI models to provide the best architectural guidance. I need your help with an architectural decision.
 
 Decision Type: {decision_type}
 Language/Stack: {language or 'Not specified'}
@@ -201,17 +232,54 @@ Before making your recommendation, please research this topic using the availabl
 - Look at community discussions on Reddit
 - Check StackOverflow for technical considerations
 
-After your research, provide:
-1. Your specific recommendation
+Your response will be compared against other AI models, so provide:
+1. Your specific recommendation with clear justification
 2. Detailed reasoning based on your research findings
-3. Trade-offs and alternatives you discovered
-4. Implementation considerations
+3. Trade-offs and alternatives you considered
+4. Implementation considerations and best practices
+5. Why your approach is superior to alternatives
 
-Focus on practical, production-ready advice based on real-world evidence."""
+Focus on practical, production-ready advice based on real-world evidence. Be confident and specific in your recommendations."""
 
-        print("🤖 Starting single model research...")
-        print(f"  📊 Using GPT-4o with autonomous research...")
+        model_teams = Config.get_model_teams()
+        responses = []
 
-        # Use GPT-4o for v0.1
-        response = await self.get_model_response("openai/gpt-4o", prompt)
-        return response
+        print("🏆 Starting model team competition...")
+
+        # Run all models concurrently for better performance
+        tasks = []
+        for team_name, models in model_teams.items():
+            for model_name in models:
+                print(f"  🤖 {team_name.upper()}: {model_name}")
+                task = self.get_model_response(model_name, prompt)
+                tasks.append(task)
+
+        # Execute all models concurrently
+        model_responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process results and handle any exceptions
+        model_index = 0
+        for team_name, models in model_teams.items():
+            for model_name in models:
+                if model_index < len(model_responses):
+                    response = model_responses[model_index]
+                    if isinstance(response, Exception):
+                        # Create error response for failed models
+                        error_response = ModelResponse(
+                            model_name=model_name,
+                            team=team_name,
+                            recommendation=f"Error: {str(response)}",
+                            reasoning="Model failed to respond",
+                            trade_offs=[],
+                            confidence_score=0.0,
+                            response_time=0.0,
+                            research_steps=[]
+                        )
+                        responses.append(error_response)
+                    else:
+                        # Update team name for successful responses
+                        response.team = team_name
+                        responses.append(response)
+                model_index += 1
+
+        return responses

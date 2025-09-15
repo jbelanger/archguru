@@ -28,7 +28,7 @@ class StackOverflowClient:
             params["tagged"] = ";".join(tags)
 
         try:
-            response = self.session.get(f"{self.base_url}/search", params=params)
+            response = self.session.get(f"{self.base_url}/search", params=params, timeout=8)
             response.raise_for_status()
 
             results = []
@@ -63,7 +63,7 @@ class StackOverflowClient:
             params["inname"] = related_to
 
         try:
-            response = self.session.get(f"{self.base_url}/tags", params=params)
+            response = self.session.get(f"{self.base_url}/tags", params=params, timeout=8)
             response.raise_for_status()
 
             results = []
