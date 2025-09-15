@@ -19,7 +19,7 @@ class Config:
     # Model teams for competition (configurable via environment variables)
     DEFAULT_MODEL_TEAMS = {
         "team_a": [
-            "openai/gpt-oss-120b:free",
+            "openai/gpt-oss-120b",
             "openai/gpt-5-nano"
         ],
         "team_b": [
@@ -563,6 +563,9 @@ async def run_decision(args) -> int:
 
 async def _display_competition_results(result, verbose: bool = False):
     """Display results from model competition"""
+    def _preview(text: str, lines: int = 12) -> str:
+        return "\n".join((text or "").strip().splitlines()[:lines])
+
     responses = result.model_responses or []
     successful_responses = [r for r in responses if not r.recommendation.startswith("Error:")]
 
@@ -577,6 +580,17 @@ async def _display_competition_results(result, verbose: bool = False):
     print(result.consensus_recommendation or "No consensus reached")
 
     if verbose:
+        # v0.2 requirement: side-by-side recommendations + research approach
+        print(f"\n🧪 Side-by-side recommendations:")
+        for r in responses:
+            if r.recommendation.startswith("Error:"):
+                continue
+            funcs = [step.get("function", "") for step in (r.research_steps or [])]
+            print(f"\n--- {r.model_name} ({r.team}) — {r.response_time:.2f}s ---")
+            print(_preview(r.recommendation, 12))
+            if funcs:
+                print(f"🔎 Research approach: {', '.join(funcs)}")
+
         print(f"\n🎯 Individual Model Performance:")
         for i, response in enumerate(responses, 1):
             status = "✅" if not response.recommendation.startswith("Error:") else "❌"
@@ -920,7 +934,7 @@ class StackOverflowClient:
             params["tagged"] = ";".join(tags)
 
         try:
-            response = self.session.get(f"{self.base_url}/search", params=params)
+            response = self.session.get(f"{self.base_url}/search", params=params, timeout=8)
             response.raise_for_status()
 
             results = []
@@ -955,7 +969,7 @@ class StackOverflowClient:
             params["inname"] = related_to
 
         try:
-            response = self.session.get(f"{self.base_url}/tags", params=params)
+            response = self.session.get(f"{self.base_url}/tags", params=params, timeout=8)
             response.raise_for_status()
 
             results = []
@@ -1002,7 +1016,7 @@ class GitHubClient:
         }
 
         try:
-            response = self.session.get(f"{self.base_url}/search/repositories", params=params)
+            response = self.session.get(f"{self.base_url}/search/repositories", params=params, timeout=8)
             response.raise_for_status()
 
             results = []
@@ -1024,7 +1038,7 @@ class GitHubClient:
     def get_repository_structure(self, owner: str, repo: str) -> Dict[str, Any]:
         """Get repository file structure"""
         try:
-            response = self.session.get(f"{self.base_url}/repos/{owner}/{repo}/contents")
+            response = self.session.get(f"{self.base_url}/repos/{owner}/{repo}/contents", timeout=8)
             response.raise_for_status()
 
             structure = []
@@ -1089,7 +1103,8 @@ class RedditClient:
 
                 response = self.session.get(
                     f"{self.base_url}/r/{subreddit}/search.json",
-                    params=params
+                    params=params,
+                    timeout=8
                 )
                 response.raise_for_status()
 
@@ -1122,7 +1137,8 @@ class RedditClient:
 
             response = self.session.get(
                 f"{self.base_url}/r/{subreddit}/top.json",
-                params=params
+                params=params,
+                timeout=8
             )
             response.raise_for_status()
 

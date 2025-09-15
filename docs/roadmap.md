@@ -1,290 +1,566 @@
-# ArchGuru Product Roadmap
-*Strategic development plan for Universal AI Architecture Decision Platform with LLM-Driven Research*
+# ArchGuru Roadmap: From MVP v0.2 to Solid v1.0
 
-## Vision Statement
-Build a **Universal AI Architecture Decision Platform** that uses competing AI model teams with autonomous research to provide architectural guidance across technology domains. Make architectural consulting more accessible through real-time, multi-perspective decision support.
+_Simplicity-first, additive development from existing Phase 2 implementation_
 
-## Product Strategy
-- **LLM-Driven Research**: Each model autonomously researches and synthesizes information
-- **Multi-Model Competition**: Core differentiation through AI model team competition
-- **Universal Decision Engine**: Single platform for all architectural decision types
-- **Performance Analytics**: Data-driven insights on model expertise and research strategies
+## Current Status: Phase 2 Complete (v0.2)
 
-## Core Architecture (Simplified)
-```
-User Input → Model Teams (A, B, C) → Autonomous Research → Recommendations → Cross-Model Debate → Final Output
-                     ↓
-            Each LLM uses GitHub/Reddit/SO APIs as tools
-```
+**What we have working:**
 
----
+- ✅ CLI runs **multiple models concurrently** and prints side-by-side results
+- ✅ Research steps preview showing model research approaches
+- ✅ Config supports **teams & arbiter model** via environment variables
+- ✅ Debate/arbiter scaffolding exists (gated for future use)
+- ✅ OpenRouter integration with GitHub, Reddit, StackOverflow APIs
+- ✅ LangGraph pipeline orchestrating model competition
 
-## **Release v0.1: Single Model Foundation** ⚡
-**Timeline**: Week 1-2
-**Objective**: Basic CLI with single model making autonomous research decisions
+**Current capabilities:**
 
-**Key Features**:
-- CLI interface with argument parsing (`archguru --type project-structure --language python`)
-- Single OpenRouter model (GPT-4o) with research tools
-- LLM autonomously decides what to research on GitHub/Reddit/StackOverflow
-- Basic project structure recommendations
-
-**Technical Deliverables**:
-- Production CLI with `archguru` command
-- OpenRouter API integration
-- LLM tool access to external APIs (GitHub, Reddit, StackOverflow)
-- LangGraph pipeline foundation
-
-**Success Metrics**:
-- Working CLI generates researched recommendations
-- LLM successfully uses external APIs as tools
-- <2 minute response time
-
----
-
-## **Release v0.2: Two-Model Competition** 👥
-**Timeline**: Week 3-4
-**Objective**: Add second model team with different research strategies
-
-**Key Features**:
-- Parallel execution of GPT-4o and Claude-3.5-Sonnet teams
-- Each model autonomously chooses research strategy
+- N=2+ models compete with parallel execution
+- Each model uses external APIs as research tools
 - Side-by-side recommendation comparison
-- Research approach comparison (what each model chose to investigate)
-
-**Technical Deliverables**:
-- Parallel LangGraph execution for multiple models
-- Model response comparison engine
-- Research strategy tracking and display
-- Rich CLI output showing both recommendations
-
-**Success Metrics**:
-- Both models complete research and recommendations <3 minutes
-- Clear differentiation in research approaches
-- Users can see how different research led to different conclusions
+- Arbiter evaluation (foundation exists)
+- Rich CLI output with research methodology display
 
 ---
 
-## **Release v0.3: Caching & Performance** 🚀
-**Timeline**: Week 5-6
-**Objective**: Add intelligent caching to optimize repeated queries and API costs
+## Development Approach: Additive Only
 
-**Key Features**:
-- SQLite caching for external API responses
-- Model response caching with context awareness
-- Intelligent cache invalidation (time-based and content-based)
-- Performance analytics on cache hit rates
+**Core Principle:** Keep existing tools/pipeline exactly as-is. Only **add** features, never rewrite.
 
-**Technical Deliverables**:
-- SQLite database with caching layer
-- Cache management system with TTL
-- API rate limiting and optimization
-- Performance monitoring
+**Guardrails:**
 
-**Success Metrics**:
-- <30 second cached response times
-- >70% cache hit rate for common queries
-- Significant API cost reduction
+- ✅ Only additive DB migrations (start with Required tables, add optional later)
+- ✅ Keep DecisionType contract stable (gather_context → research_plan → evaluate)
+- ✅ Advanced features gated by flags (default OFF): `ENABLE_REDDIT`, `ENABLE_SO`, `ENABLE_TRUESKILL`, `ENABLE_BANDIT`, `ENABLE_DEBATE`
+- ✅ All edits are atomic - either succeed completely or don't apply
 
 ---
 
-## **Release v0.4: Third Model & Research Analytics** 🧠
-**Timeline**: Week 7-8
-**Objective**: Add third model team and analytics on research effectiveness
+# Roadmap: v0.3 → v1.0
 
-**Key Features**:
-- Add Llama-3.1-70B as third competing model
-- Research strategy analytics (which approaches work best)
-- Model expertise tracking across decision types
-- Research path visualization
+## v0.3 — Persistence Baseline ⚡
 
-**Technical Deliverables**:
-- Scalable N-model execution architecture
-- Research analytics and tracking system
-- Model performance database
-- Research strategy effectiveness metrics
+**Timeline:** 3-4 days
+**Goal:** Write one record per run and per model output
+**Priority:** Essential foundation for all future features
 
-**Success Metrics**:
-- Three models with distinct research strategies
-- Clear data on which research approaches excel
-- Research strategy recommendations for users
+**What to add:**
 
----
+- **Minimal SQLite schema** (`decisions`, `model_responses`, `tool_calls` tables)
+- **Single persistence hook** called once after pipeline finishes
+- **Basic stats command** (`archguru --stats`) showing decision count, latency, cost
 
-## **Release v0.5: Cross-Model Debate System** ⚔️
-**Timeline**: Week 9-11
-**Objective**: Models critique each other's research and recommendations
+**Technical work:**
 
-**Key Features**:
-- Models analyze and critique each other's research approaches
-- Structured debate protocols with evidence evaluation
-- Models can challenge each other's findings
-- Consensus building and conflict resolution
+```python
+# Add src/archguru/storage/repo.py
+def persist_run_result(conn, result, arbiter_model_name, prompt_version):
+    # Insert into run, model_response, tool_call tables
+    # Store context hash, type, winner, per-team metrics
+```
 
-**Technical Deliverables**:
-- Cross-model interaction framework
-- Debate orchestration with LangGraph
-- Evidence quality evaluation system
-- Argument tracking and synthesis
+**Success criteria:**
 
-**Success Metrics**:
-- Models successfully engage in evidence-based debates
-- Debate outcomes improve recommendation quality >15%
-- Users see clear value in debate-refined recommendations
+- Every run writes to SQLite automatically
+- `--stats` shows count of decisions and basic per-model metrics
+- Zero impact on current CLI flow
 
 ---
 
-## **Release v0.6: Universal Decision Types** 🌐
-**Timeline**: Week 12-14
-**Objective**: Expand beyond project structures to all architectural decisions
+## v0.4 — Pairwise + Elo (Online) 🏆
 
-**Key Features**:
-- Database architecture decisions (SQL/NoSQL/Graph/Vector)
-- Deployment strategy analysis (Cloud/Container/Serverless/Edge)
-- API design recommendations (REST/GraphQL/gRPC/WebSocket)
-- Security architecture patterns and authentication strategies
+**Timeline:** 2-3 days
+**Goal:** Immediate per-type model ranking without new orchestration
+**Priority:** Core competitive differentiation
 
-**Technical Deliverables**:
-- Decision type plugin architecture
-- Domain-specific research strategies
-- Cross-domain model performance analysis
-- Context-aware decision type detection
+**What to add:**
 
-**Success Metrics**:
-- Support for 5+ major architectural decision categories
-- Models adapt research strategies to decision type
-- Consistent quality across all decision domains
+- **`pairwise_judgments` table** + Elo updater (online)
+- **Model ratings** tracked per decision type
+- **Top 5 rankings** in stats output
 
----
+**Technical work:**
 
-## **Release v0.7: Extended Research Capabilities** 🔬
-**Timeline**: Week 15-17
-**Objective**: Enhanced research tools and data sources
+```python
+# When arbiter selects winner, write winner vs each other model
+# Maintain model_rating(algo='elo', decision_type_id, rating, matches)
+# Update Elo immediately after each judgment
+```
 
-**Key Features**:
-- Documentation and benchmarking data integration
-- Code repository analysis and pattern recognition
-- Technology trend analysis and adoption metrics
-- Performance benchmarking data integration
+**Success criteria:**
 
-**Technical Deliverables**:
-- Extended API integrations (HackerNews, ArXiv, tech blogs)
-- Code analysis tools for repository insights
-- Benchmarking data aggregation
-- Trend analysis algorithms
-
-**Success Metrics**:
-- Models use 10+ diverse data sources in research
-- Research includes quantitative performance data
-- Technology adoption trends influence recommendations
+- `--stats` prints **Top 5 by Elo** per decision type
+- Elo ratings update in real-time
+- Zero latency impact on decisions
 
 ---
 
-## **Release v0.8: Web Platform & API** ☁️
-**Timeline**: Week 18-20
-**Objective**: Launch web application with full API platform
+## v0.5 — Strong Recommendation Output 💪
 
-**Key Features**:
-- Full-featured web dashboard showing research paths
-- RESTful API with documentation
-- Real-time research process visualization
-- Shareable reports with research methodology
+**Timeline:** 1-2 days
+**Goal:** First line is always a decisive, quotable recommendation
+**Priority:** High - core user value
 
-**Technical Deliverables**:
-- React-based web application
-- FastAPI backend with OpenAPI documentation
-- Real-time WebSocket for research progress
-- Report generation and sharing system
+**What to add:**
 
-**Success Metrics**:
-- Web platform adoption >500 users
-- API usage >5,000 requests/month
-- Users share research reports >30% of sessions
+- **Tighten generation prompt** to force structured output
+- **Stricter parsing** for consistent format
+- **Quality validation** with fallback handling
 
----
+**Technical work:**
 
-## **Release v0.9: Enterprise Features** 🏢
-**Timeline**: Week 21-23
-**Objective**: Enterprise features for teams and organizations
+```
+Prompt change only:
+"OUTPUT FORMAT (STRICT):
+Final Recommendation: <one sentence>
 
-**Key Features**:
-- Team workspaces with shared research history
-- Custom model configurations and research preferences
-- Enterprise API integrations and SSO
-- Analytics and reporting dashboards
+Reasoning:
+- <bullet points>
 
-**Technical Deliverables**:
-- Multi-tenant architecture
-- Enterprise authentication and authorization
-- Custom model configuration management
-- Enterprise reporting and analytics
+Trade-offs:
+- <bullet points>"
+```
 
-**Success Metrics**:
-- >20 enterprise teams using platform
-- Team collaboration features adoption >60%
-- Enterprise security compliance achieved
+**Success criteria:**
+
+- 95% of runs produce the strict header format
+- Failing runs flagged in logs with fallback
+- Current parser continues working unchanged
 
 ---
 
-## **Release v1.0: AI Research Intelligence** 🧬
-**Timeline**: Week 24-26
-**Objective**: AI capabilities and continuous learning
+## v0.6 — Arbiter Rubric + Richer Pairwise 📊
 
-**Key Features**:
-- Model research strategy optimization through reinforcement learning
-- Predictive analytics for architectural decision trends
-- Research quality scoring and improvement suggestions
-- Automated research methodology refinement
+**Timeline:** 2-3 days
+**Goal:** Make arbiter judgments slightly more informative
+**Priority:** Medium - improves rating quality
 
-**Technical Deliverables**:
-- Reinforcement learning for research optimization
-- Predictive analytics engine
-- Research quality evaluation system
-- Automated methodology improvement
+**What to add:**
 
-**Success Metrics**:
-- Research quality improves >25% through learning
-- Predictive accuracy for tech trends >80%
-- Models develop specialized research expertise
+- **Short rubric** (evidence quality, risk awareness, clarity)
+- **Reasoning field** in pairwise_judgments table
+- **Enhanced arbiter prompts** with structured evaluation
+
+**Technical work:**
+
+```python
+# Add reason field to pairwise judgments
+# Simple rubric scoring (1-5 scale)
+# Persist one-line reason with each judgment
+```
+
+**Success criteria:**
+
+- Pairwise rows have winner/loser + reason
+- Elo still updates online automatically
+- Arbiter decisions more transparent
+
+---
+
+## v0.7 — Presets Lite + Budget Guardrails 💰
+
+**Timeline:** 2-3 days
+**Goal:** Simple defaults per decision type; cost control
+**Priority:** Medium - user experience improvement
+
+**What to add:**
+
+- **Minimal presets** as config (per ADR-001)
+- **Cost ceiling** enforcement per run
+- **Smart defaults** based on decision type
+
+**Technical work:**
+
+```python
+# presets.yaml with model defaults per decision type
+# Cost tracking and ceiling enforcement
+# --type api-design picks preset models automatically
+```
+
+**Success criteria:**
+
+- `--type api-design` picks its preset models
+- Runs abort politely if cost ceiling exceeded
+- User can override presets with explicit model flags
 
 ---
 
-## Success Metrics & KPIs
+## v0.8 — Cache Hygiene (Versioned + TTL) 🚀
 
-### Platform Performance
-- **Response Time**: <30s cached, <3min fresh research
-- **Research Quality**: Models find relevant, current information >90%
-- **User Satisfaction**: >90% find research-backed recommendations helpful
+**Timeline:** 2-3 days
+**Goal:** Speed and determinism for follow-ups
+**Priority:** High - performance critical
 
-### Model Competition
-- **Research Differentiation**: Clear differences in model research strategies
-- **Debate Quality**: Models provide evidence-based critiques and improvements
-- **Expertise Development**: Models develop specialized knowledge domains
+**What to add:**
 
-### Business Impact
-- **User Growth**: 5,000+ active users by v1.0
-- **Decision Volume**: 50,000+ researched architectural decisions
-- **Market Position**: AI architecture decision platform with autonomous research
+- **Versioned cache keys** (include prompt_template_version, pipeline_version)
+- **TTL for external APIs** (GitHub: 7 days, Reddit/SO: 3 days)
+- **Cache hit/miss counters** in stats
 
-## Technology Stack
+**Technical work:**
 
-- **Python 3.13** with uv package manager
-- **LangGraph** for model orchestration and tool usage
-- **OpenRouter** for multi-model access with tool capabilities
-- **SQLite** for caching and analytics (→ PostgreSQL for scale)
-- **External APIs** as LLM tools: GitHub, Reddit, StackOverflow, HackerNews
-- **Rich/Typer** for CLI interface
-- **FastAPI** for web platform and API endpoints
+```python
+cache_key = sha256(
+    decision_type + "\n" +
+    normalize(context) + "\n" +
+    model + "\n" +
+    prompt_template_version + "\n" +
+    pipeline_version
+)
+```
 
-## Key Innovation: LLM-Driven Research
+**Success criteria:**
 
-Unlike traditional systems that pre-define research pipelines, ArchGuru lets each LLM model:
-- **Autonomously decide** what research is needed for each decision
-- **Choose research strategies** that align with their reasoning approach
-- **Adapt research depth** based on decision complexity
-- **Develop expertise** in specific research methodologies
-- **Critique and improve** each other's research approaches
-
-This creates a self-improving system where models compete not just on reasoning, but on research strategy and information synthesis.
+- Cache hit/miss counters visible in `--stats`
+- Cached runs return in <30s (ADR success criteria)
+- Cache invalidation works correctly on prompt/pipeline changes
 
 ---
+
+## v0.9 — Evidence v1 (GitHub-Only Default) 🔍
+
+**Timeline:** 3-4 days
+**Goal:** Keep tools, but keep it lean
+**Priority:** Medium - research credibility
+
+**What to add:**
+
+- **GitHub results** stored as `tool_call` rows
+- **Flag to enable** Reddit/SO (default OFF)
+- **Citation formatting** in output
+
+**Technical work:**
+
+```python
+# Store tool results in tool_call table
+# GitHub enabled by default, Reddit/SO behind ENABLE_* flags
+# Format citations in final output
+```
+
+**Success criteria:**
+
+- Each response lists 0-5 GitHub citations
+- Reddit/SO only enabled with explicit flag
+- Cache respected for all tool calls
+
+---
+
+## v0.10 — N=2 Default + Manual Escalation 👥
+
+**Timeline:** 1-2 days
+**Goal:** Strong recommendations at low cost
+**Priority:** High - cost optimization
+
+**What to add:**
+
+- **N=2 by default** (cost-effective baseline)
+- **`--escalate` flag** to add 3rd model manually
+- **Escalation triggers** in config but OFF by default
+
+**Technical work:**
+
+```python
+# Default to 2 models unless --escalate specified
+# Keep escalation logic but gate behind user flag
+# Config escalation triggers but don't auto-escalate
+```
+
+**Success criteria:**
+
+- Two-model flow <2 min
+- `--escalate` adds 3rd model <3.5 min (ADR criteria)
+- Cost reduction vs current unlimited model approach
+
+---
+
+## v0.11 — API/Export Surface 📄
+
+**Timeline:** 2-3 days
+**Goal:** Make results consumable by other tools
+**Priority:** Medium - integration value
+
+**What to add:**
+
+- **`--export decision.md|json`** flag
+- **Structured JSON** with all model responses
+- **Markdown reports** with recommendations + trade-offs
+
+**Technical work:**
+
+```python
+# Export functionality using existing display logic
+# JSON format with structured model responses
+# Markdown template with recommendation summary
+```
+
+**Success criteria:**
+
+- `--export json` produces structured JSON
+- `--export markdown` creates readable reports
+- External tools can consume JSON format
+
+---
+
+## v0.12 — TrueSkill (Batch, Telemetry-Only) 📈
+
+**Timeline:** 3-4 days
+**Goal:** Future-proof ratings without changing production
+**Priority:** Low - advanced analytics
+
+**What to add:**
+
+- **Nightly/weekly job** computes hierarchical TrueSkill
+- **`model_rating(algo='trueskill')`** table entries
+- **No production routing** changes (telemetry only)
+
+**Technical work:**
+
+```python
+# Batch job computing TrueSkill from pairwise judgments
+# Write trueskill ratings to separate algo entries
+# Keep production using Elo/presets only
+```
+
+**Success criteria:**
+
+- `--stats --algo trueskill` shows rankings
+- Production still uses Elo/presets for model selection
+- TrueSkill data available for future features
+
+---
+
+## v0.13 — Bandit Suggestion (Advisory) 🎯
+
+**Timeline:** 2-3 days
+**Goal:** Prepare for smarter defaults while keeping behavior predictable
+**Priority:** Low - advanced optimization
+
+**What to add:**
+
+- **Bandit algorithm** computes top-2 models as advisory
+- **Advisory line** in CLI output (not enforced)
+- **Fallback to presets** for actual model selection
+
+**Technical work:**
+
+```python
+# Bandit algorithm suggesting optimal model pairs
+# CLI shows: "Bandit suggests X + Y (advisory)"
+# No change to actual model selection logic
+```
+
+**Success criteria:**
+
+- CLI shows bandit suggestions as advisory info
+- Model selection still uses presets/user config
+- Bandit learning improves over time
+
+---
+
+## v0.14 — Minimal Personality Telemetry 🧠
+
+**Timeline:** 2-3 days
+**Goal:** Capture low-effort signals for insights
+**Priority:** Low - research data
+
+**What to add:**
+
+- **Simple pattern counters** (mentions serverless, prefers GraphQL, etc.)
+- **Tiny table** for personality signals (opt-in)
+- **Off by default** with `ENABLE_PERSONALITY_TRACKING` flag
+
+**Technical work:**
+
+```python
+# Log 2-3 simple counters when enabled
+# Pattern matching on model responses
+# Optional --stats personality display
+```
+
+**Success criteria:**
+
+- Optional `--stats personality` prints top signals per model
+- Zero impact when disabled (default)
+- Data available for future personality profiling
+
+---
+
+# v1.0 — "Strong Recs + Live Ratings" 🎯
+
+## Definition of Done
+
+**Core capabilities:**
+
+- ✅ **N=2 default** with optional manual escalate to 3
+- ✅ **Strong, first-line recommendations** consistently delivered
+- ✅ **Elo rankings online** per decision type
+- ✅ **TrueSkill available** for dashboards/analytics
+- ✅ **Presets + cache + cost guardrails** stable
+- ✅ **JSON/Markdown export** and basic stats
+
+**Performance targets (from ADR-001):**
+
+- N=2 end-to-end decision: **<2 minutes**
+- Escalated N=3: **<3.5 minutes**
+- Cached responses: **<30 seconds**
+
+**Quality targets:**
+
+- 95% of runs produce structured "Final Recommendation" format
+- Elo ratings provide meaningful model rankings per decision type
+- Cost per decision reduced 40%+ vs unlimited model approach
+
+---
+
+# Technical Implementation Guide
+
+## Database Schema (Additive Migrations)
+
+**Phase 1 - Core tables (v0.3):**
+
+```sql
+-- migrations/0001_core.sql
+CREATE TABLE model (
+  id SERIAL PRIMARY KEY,
+  name TEXT UNIQUE NOT NULL,
+  provider TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE decision_type (
+  id SERIAL PRIMARY KEY,
+  key TEXT UNIQUE NOT NULL,
+  label TEXT
+);
+
+CREATE TABLE run (
+  id UUID PRIMARY KEY,
+  decision_type_id INT REFERENCES decision_type(id),
+  language TEXT,
+  framework TEXT,
+  requirements TEXT,
+  prompt_version TEXT,
+  arbiter_model_id INT REFERENCES model(id),
+  consensus_reco TEXT,
+  debate_summary TEXT,
+  total_time_sec REAL,
+  error TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE model_response (
+  id UUID PRIMARY KEY,
+  run_id UUID REFERENCES run(id) ON DELETE CASCADE,
+  model_id INT REFERENCES model(id),
+  team TEXT,
+  recommendation TEXT,
+  reasoning TEXT,
+  trade_offs JSONB,
+  confidence_score REAL,
+  response_time_sec REAL,
+  success BOOLEAN DEFAULT TRUE,
+  error TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE tool_call (
+  id BIGSERIAL PRIMARY KEY,
+  response_id UUID REFERENCES model_response(id) ON DELETE CASCADE,
+  function TEXT,
+  arguments JSONB,
+  result_excerpt TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Phase 2 - Ratings (v0.4):**
+
+```sql
+-- migrations/0002_ratings.sql
+CREATE TABLE pairwise_judgment (
+  id BIGSERIAL PRIMARY KEY,
+  run_id UUID REFERENCES run(id) ON DELETE CASCADE,
+  decision_type_id INT REFERENCES decision_type(id),
+  judge_model_id INT REFERENCES model(id),
+  winner_model_id INT REFERENCES model(id),
+  loser_model_id INT REFERENCES model(id),
+  reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(run_id, winner_model_id, loser_model_id)
+);
+
+CREATE TABLE model_rating (
+  id BIGSERIAL PRIMARY KEY,
+  model_id INT REFERENCES model(id),
+  decision_type_id INT REFERENCES decision_type(id),
+  algo TEXT NOT NULL, -- "elo" | "trueskill"
+  rating REAL,        -- Elo rating
+  k_factor REAL,      -- Elo K factor
+  mu REAL,            -- TrueSkill mu
+  sigma REAL,         -- TrueSkill sigma
+  matches INT DEFAULT 0,
+  last_updated TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(model_id, decision_type_id, algo)
+);
+```
+
+## Integration Points
+
+**Persistence Hook (v0.3):**
+
+```python
+# src/archguru/cli/main.py after line 80
+result = await pipeline.run(request)
+await persist_run_result(conn, result, arbiter_model_name="gpt-4o", prompt_version="1.0")
+await _display_competition_results(result, args.verbose)
+```
+
+**Elo Updates (v0.4):**
+
+```python
+# After inserting pairwise judgments
+await update_elo_ratings(conn, run_id, pairwise_judgments)
+```
+
+**Enhanced Prompt (v0.5):**
+
+```python
+# Update competition prompt string only
+PROMPT_TEMPLATE = """
+OUTPUT FORMAT (STRICT):
+1) First paragraph MUST begin with: "Final Recommendation: <one crisp sentence>"
+2) Then a blank line, then "Reasoning:" as 3–6 bullet points
+3) Then "Trade-offs:" as bullet points
+4) Then "Implementation Steps:" as 3–7 bullet points
+5) Then "Evidence:" as bullet list of sources
+
+Focus on practical, production-ready advice. Be confident and specific.
+"""
+```
+
+---
+
+# Why This Roadmap Works
+
+## Keeps What's Working
+
+- ✅ **Zero changes** to LangGraph nodes, debate, or tool implementations
+- ✅ **Ratings are online** (no batch jobs initially)
+- ✅ **Recommendations get stronger** via prompt discipline
+- ✅ **Current CLI flow unchanged** - only adds persistence and analytics
+
+## Delivers Value Fast
+
+- **v0.3-v0.5** (1-2 weeks): Persistent data + live rankings + strong recommendations
+- **v0.6-v0.8** (1-2 weeks): Enhanced quality + performance optimizations
+- **v0.9-v1.0** (2-3 weeks): Export capabilities + advanced features
+
+## Future-Proofs Architecture
+
+- Schema supports TrueSkill from day 1 (just unused initially)
+- Feature flags allow gradual rollout of advanced capabilities
+- Additive approach means no breaking changes or rewrites
+
+---
+
+_This roadmap transforms your working Phase 2 implementation into a production-ready platform with live model rankings, strong recommendations, and comprehensive analytics - all while keeping your existing tools and pipeline completely intact._
