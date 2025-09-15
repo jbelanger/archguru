@@ -61,7 +61,15 @@ class ModelDebateEngine:
             context += f"=== MODEL {i}: {response.model_name} ===\n"
             context += f"Recommendation: {clip(response.recommendation, 240)}\n"
             context += f"Reasoning: {clip(response.reasoning, 900)}\n"
-            context += f"Research Steps: {len(response.research_steps or [])} tool calls\n"
+
+            # Enhanced research behavior tracking
+            research_steps = len(response.research_steps or [])
+            skipped_research = getattr(response, 'skipped_research', False)
+            if skipped_research:
+                context += f"Research Steps: {research_steps} tool calls (SKIPPED EXPECTED RESEARCH)\n"
+            else:
+                context += f"Research Steps: {research_steps} tool calls\n"
+
             context += f"Response Time: {response.response_time:.2f}s\n"
 
             if response.trade_offs:

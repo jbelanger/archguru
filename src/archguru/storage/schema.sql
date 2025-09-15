@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS model_response (
   response_time_sec REAL,
   success BOOLEAN DEFAULT TRUE,
   error TEXT,
+  skipped_research BOOLEAN DEFAULT FALSE, -- Track if model skipped expected research
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

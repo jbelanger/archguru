@@ -248,6 +248,23 @@ class OpenRouterClient:
             response_time = time.time() - start_time
             content = response.choices[0].message.content
 
+            # Track if model skipped research tools (for performance metrics)
+            skipped_research = len(research_steps) == 0 and "research" in prompt.lower()
+            if skipped_research:
+                # Check response object for token usage info
+                response_info = ""
+                if hasattr(response, 'usage'):
+                    usage = getattr(response, 'usage', None)
+                    if usage:
+                        prompt_tokens = getattr(usage, 'prompt_tokens', 0)
+                        completion_tokens = getattr(usage, 'completion_tokens', 0)
+                        response_info = f" (tokens: {prompt_tokens}→{completion_tokens})"
+
+                print(f"  ⚠️  {model_name} skipped research tools (time: {response_time:.2f}s){response_info}")
+                if content:
+                    print(f"      Response preview: {content[:150].strip() if content else ''}...")
+                # Continue to allow the response but mark it for lower scoring
+
             # Use parser for consistency
             if not content or content.strip() == "":
                 print(f"  ⚠️  {model_name} returned empty content (research steps: {len(research_steps)}, time: {response_time:.2f}s)")
@@ -266,33 +283,69 @@ class OpenRouterClient:
             # Parse response using ResponseParser
             parsed = self.parser.parse_model_response(content)
 
+            # Adjust confidence score based on research behavior
+            base_confidence = 0.8
+            if skipped_research:
+                base_confidence = 0.6  # Lower confidence for models that skip research
+
             return ModelResponse(
                 model_name=model_name,
                 team="competitor",
                 recommendation=parsed.recommendation,
                 reasoning=parsed.reasoning,
-                trade_offs=parsed.trade_offs if parsed.trade_offs else ["Analysis based on research"],
-                confidence_score=0.8,
+                trade_offs=parsed.trade_offs if parsed.trade_offs else (["Analysis based on research"] if not skipped_research else ["Analysis without research"]),
+                confidence_score=base_confidence,
                 response_time=response_time,
-                research_steps=research_steps
+                research_steps=research_steps,
+                skipped_research=skipped_research
             )
 
         except Exception as e:
-            print(f"❌ Error with {model_name}: {str(e)}")
+            error_msg = str(e)
+            print(f"❌ Error with {model_name}: {error_msg}")
             print(f"  🔍 Exception type: {type(e).__name__}")
+
+            # Extract detailed error information
+            detailed_error = error_msg
+
             # Check for HTTP response attributes more carefully
             try:
                 if hasattr(e, 'response') and getattr(e, 'response', None):
                     response_obj = getattr(e, 'response')
-                    print(f"  🔍 HTTP status: {getattr(response_obj, 'status_code', 'unknown')}")
-                    print(f"  🔍 Response text: {getattr(response_obj, 'text', 'unknown')[:200]}")
+                    status_code = getattr(response_obj, 'status_code', 'unknown')
+                    response_text = getattr(response_obj, 'text', 'unknown')[:200]
+                    print(f"  🔍 HTTP status: {status_code}")
+                    print(f"  🔍 Response text: {response_text}")
+                    detailed_error = f"{error_msg} (HTTP {status_code}: {response_text})"
+
+                # Check for OpenAI-specific error details
+                if hasattr(e, 'body') and getattr(e, 'body', None):
+                    body = getattr(e, 'body')
+                    if isinstance(body, dict):
+                        error_info = body.get('error', {})
+                        if isinstance(error_info, dict):
+                            error_type = error_info.get('type', '')
+                            error_code = error_info.get('code', '')
+                            error_message = error_info.get('message', '')
+                            if error_message:
+                                print(f"  🔍 API error: {error_type} ({error_code}): {error_message}")
+                                detailed_error = f"{error_type}: {error_message}"
+
+                # Check for rate limiting or model availability issues
+                if "rate" in error_msg.lower():
+                    detailed_error = f"Rate limited: {error_msg}"
+                elif "model" in error_msg.lower() and ("not found" in error_msg.lower() or "unavailable" in error_msg.lower()):
+                    detailed_error = f"Model unavailable: {error_msg}"
+                elif "authentication" in error_msg.lower() or "unauthorized" in error_msg.lower():
+                    detailed_error = f"Authentication error: {error_msg}"
+
             except Exception:
                 pass  # Don't fail on logging errors
             return ModelResponse(
                 model_name=model_name,
                 team="competitor",
-                recommendation=f"Error: {str(e)}",
-                reasoning="Model failed to respond",
+                recommendation=f"Error: {detailed_error}",
+                reasoning=f"Model failed to respond: {detailed_error}",
                 trade_offs=[],
                 confidence_score=0.0,
                 response_time=time.time() - start_time,

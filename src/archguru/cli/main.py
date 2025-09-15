@@ -101,6 +101,7 @@ async def run_decision(args) -> int:
                     'response_time_sec': response.response_time,
                     'success': getattr(response, 'success', True),
                     'error': response.recommendation if not getattr(response, 'success', True) else None,
+                    'skipped_research': getattr(response, 'skipped_research', False),
                     'tool_calls': [
                         {
                             'function': step.get('function', ''),
@@ -177,8 +178,11 @@ async def _display_competition_results(result, verbose: bool = False):
         print(f"\n🎯 Individual Model Performance:")
         for i, response in enumerate(responses, 1):
             status = "✅" if getattr(response, 'success', True) else "❌"
+            research_info = f"{len(response.research_steps)} steps"
+            if getattr(response, 'skipped_research', False):
+                research_info += " ⚠️ skipped"
             print(f"  {i}. {status} {response.model_name} ({response.team})")
-            print(f"     Research: {len(response.research_steps)} steps")
+            print(f"     Research: {research_info}")
             print(f"     Time: {response.response_time:.2f}s")
             if not getattr(response, 'success', True):
                 print(f"     Error: {response.recommendation}")

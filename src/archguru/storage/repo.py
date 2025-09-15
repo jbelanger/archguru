@@ -55,13 +55,23 @@ class ArchGuruRepo:
         """Apply database migrations"""
         # Check if arbiter_eval column exists
         cursor = conn.execute("""
-            SELECT COUNT(*) FROM pragma_table_info('run') 
+            SELECT COUNT(*) FROM pragma_table_info('run')
             WHERE name='arbiter_eval'
         """)
         if cursor.fetchone()[0] == 0:
             # Add arbiter_eval column
             conn.execute("ALTER TABLE run ADD COLUMN arbiter_eval TEXT")
             print("  📦 Applied migration: added arbiter_eval column")
+
+        # Check if skipped_research column exists
+        cursor = conn.execute("""
+            SELECT COUNT(*) FROM pragma_table_info('model_response')
+            WHERE name='skipped_research'
+        """)
+        if cursor.fetchone()[0] == 0:
+            # Add skipped_research column
+            conn.execute("ALTER TABLE model_response ADD COLUMN skipped_research BOOLEAN DEFAULT FALSE")
+            print("  📦 Applied migration: added skipped_research column")
 
     def _get_or_create_model(self, conn: sqlite3.Connection, model_name: str) -> int:
         """Get or create model record, return model_id"""
@@ -132,14 +142,15 @@ class ArchGuruRepo:
                 conn.execute("""
                     INSERT INTO model_response (
                         id, run_id, model_id, team, recommendation, reasoning,
-                        trade_offs, confidence_score, response_time_sec, success, error
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        trade_offs, confidence_score, response_time_sec, success, error, skipped_research
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     response_id, run_id, model_id, response.get('team'),
                     response.get('recommendation'), response.get('reasoning'),
                     json.dumps(response.get('trade_offs', [])),
                     response.get('confidence_score'), response.get('response_time_sec'),
-                    response.get('success', True), response.get('error')
+                    response.get('success', True), response.get('error'),
+                    response.get('skipped_research', False)
                 ))
 
                 # Insert tool calls if present
