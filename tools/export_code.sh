@@ -12,7 +12,7 @@ for root in "${ROOTS[@]}"; do
 
       echo "Processing $pkg -> $out_file"
 
-      find "$pkg" -type f \( \( -name "*.py" ! -name "*.test.py" \) -o -name "*.json" \) \
+      find "$pkg" -type f \( \( -name "*.py" ! -name "*.test.py" \) -o -name "*.json" -o -name "*.sql" \) \
         ! -path "*/node_modules/*" \
         ! -path "*/dist/*" \
         -exec sh -c 'echo "===== {} ====="; cat "{}"' \; \

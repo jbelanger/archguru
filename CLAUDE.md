@@ -96,18 +96,17 @@ Configure models via environment variables in `.env`:
 # Required
 OPENROUTER_API_KEY=your_key_here
 
-# Optional: Custom model teams (defaults to OpenAI, Claude, Llama)
-ARCHGURU_TEAM_A_MODELS=openai/gpt-4o,openai/gpt-4o-mini
-ARCHGURU_TEAM_B_MODELS=x-ai/grok-beta,anthropic/claude-3-haiku
-ARCHGURU_TEAM_C_MODELS=deepseek/deepseek-chat,meta-llama/llama-3.1-8b-instruct
+# v0.4: Simplified configuration - just two environment variables
+# Optional: Competing models (default: gpt-4o-mini + claude-3-haiku)
+ARCHGURU_MODELS=openai/gpt-4o-mini,anthropic/claude-3-haiku
 
 # Optional: Final arbiter model (default: openai/gpt-4o)
-ARCHGURU_ARBITER_MODEL=anthropic/claude-3.5-sonnet
+ARCHGURU_ARBITER_MODEL=openai/gpt-4o
 
 # Examples of other model combinations:
-# ARCHGURU_TEAM_A_MODELS=google/gemini-pro-1.5,google/gemini-flash-1.5
-# ARCHGURU_TEAM_B_MODELS=mistralai/mistral-large,mistralai/mistral-medium
-# ARCHGURU_TEAM_C_MODELS=qwen/qwen-2.5-72b-instruct,alibaba/qwen-turbo
+# ARCHGURU_MODELS=openai/gpt-4o,anthropic/claude-3.5-sonnet,meta-llama/llama-3.1-70b
+# ARCHGURU_MODELS=google/gemini-pro-1.5,x-ai/grok-beta,deepseek/deepseek-chat
+# ARCHGURU_ARBITER_MODEL=anthropic/claude-3.5-sonnet
 ```
 
 ## File Structure

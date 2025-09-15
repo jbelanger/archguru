@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
+from .elo import update_elo_ratings_for_run, get_elo_stats_by_decision_type
 
 @dataclass
 class RunResult:
@@ -22,6 +23,8 @@ class RunResult:
     consensus_recommendation: Optional[str]
     debate_summary: Optional[str]
     total_time_sec: float
+    winning_model: Optional[str] = None  # v0.4: Track winner for Elo updates
+    winner_source: Optional[str] = None  # v0.4: Track selection method (arbiter/fallback)
     error: Optional[str] = None
 
 
@@ -135,7 +138,58 @@ class ArchGuruRepo:
                         tool_call.get('result_excerpt')
                     ))
 
+            # v0.4: Update Elo ratings if we have a valid winner
+            if result.winning_model:
+                # Ensure winner is one of the successful participating models
+                successful_models = [r.get('model') for r in result.model_responses
+                                   if r.get('success', True) and r.get('model')]
+                if result.winning_model in successful_models:
+                    try:
+                        self._update_elo_ratings_for_winner(
+                            conn, run_id, result.winning_model,
+                            result.model_responses, decision_type_id, arbiter_model_id,
+                            result.winner_source
+                        )
+                    except Exception as e:
+                        print(f"Warning: Failed to update Elo ratings: {str(e)}")
+                else:
+                    print("ℹ️  Skipping Elo: no valid winner in this run")
+
         return run_id
+
+    def _update_elo_ratings_for_winner(
+        self,
+        conn: sqlite3.Connection,
+        run_id: str,
+        winning_model_name: str,
+        model_responses: List[Dict[str, Any]],
+        decision_type_id: int,
+        judge_model_id: int,
+        winner_source: Optional[str] = None
+    ):
+        """Update Elo ratings when arbiter selects a winner"""
+        # Get winner model ID
+        winner_model_id = self._get_or_create_model(conn, winning_model_name)
+
+        # Get all other model IDs that participated successfully
+        loser_model_ids = []
+        for response in model_responses:
+            model_name = response.get('model')
+            success = response.get('success', True)
+            if model_name and success and model_name != winning_model_name:
+                loser_id = self._get_or_create_model(conn, model_name)
+                loser_model_ids.append(loser_id)
+
+        if loser_model_ids:
+            # Set reason based on winner source
+            reason = "Arbiter selection" if winner_source == "arbiter" else "Fallback scoring"
+
+            # Update Elo ratings for all pairwise comparisons
+            updates = update_elo_ratings_for_run(
+                conn, run_id, winner_model_id, loser_model_ids,
+                decision_type_id, judge_model_id, reason
+            )
+            print(f"  📊 Updated Elo ratings: {len(updates)} pairwise comparisons ({reason})")
 
     def get_stats(self) -> Dict[str, Any]:
         """Get basic statistics for --stats command"""
@@ -174,12 +228,16 @@ class ArchGuruRepo:
                 WHERE created_at >= datetime('now', '-7 days')
             """).fetchone()[0]
 
+            # v0.4: Get Elo rankings by decision type
+            elo_rankings = get_elo_stats_by_decision_type(conn)
+
             return {
                 'total_runs': total_runs,
                 'avg_latency_sec': round(avg_latency, 2),
                 'recent_runs_7d': recent_runs,
                 'decision_types': [dict(row) for row in decision_types],
-                'model_usage': [dict(row) for row in model_usage]
+                'model_usage': [dict(row) for row in model_usage],
+                'elo_rankings': elo_rankings  # v0.4: Top 5 by Elo per decision type
             }
 
 
@@ -194,6 +252,8 @@ def persist_pipeline_result(
     consensus_recommendation: Optional[str],
     debate_summary: Optional[str],
     total_time_sec: float,
+    winning_model: Optional[str] = None,  # v0.4: Track winner for Elo
+    winner_source: Optional[str] = None,  # v0.4: Track selection method
     prompt_version: str = "1.0",
     db_path: Optional[str] = None
 ) -> str:
@@ -208,7 +268,9 @@ def persist_pipeline_result(
         arbiter_model=arbiter_model,
         consensus_recommendation=consensus_recommendation,
         debate_summary=debate_summary,
-        total_time_sec=total_time_sec
+        total_time_sec=total_time_sec,
+        winning_model=winning_model,  # v0.4: Include winner for Elo
+        winner_source=winner_source   # v0.4: Include selection method
     )
 
     repo = ArchGuruRepo(db_path)
