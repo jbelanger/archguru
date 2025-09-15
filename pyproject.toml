@@ -13,4 +13,10 @@ dependencies = [
 ]
 
 [project.scripts]
-archguru = "src.archguru.cli.main:main"
+archguru = "archguru.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
