@@ -1,389 +1,290 @@
 # ArchGuru Product Roadmap
-*Strategic development plan for Universal AI Architecture Decision Platform*
+*Strategic development plan for Universal AI Architecture Decision Platform with LLM-Driven Research*
 
 ## Vision Statement
-Build the world's first **Universal AI Architecture Decision Platform** that leverages competing AI model teams to provide expert-level architectural guidance across all technology domains. Transform expensive architectural consulting into accessible, real-time, multi-perspective decision support.
+Build a **Universal AI Architecture Decision Platform** that uses competing AI model teams with autonomous research to provide architectural guidance across technology domains. Make architectural consulting more accessible through real-time, multi-perspective decision support.
 
 ## Product Strategy
+- **LLM-Driven Research**: Each model autonomously researches and synthesizes information
 - **Multi-Model Competition**: Core differentiation through AI model team competition
 - **Universal Decision Engine**: Single platform for all architectural decision types
-- **Performance Analytics**: Data-driven insights on model expertise across domains
-- **Enterprise-Ready**: Production-grade performance, caching, and scalability
+- **Performance Analytics**: Data-driven insights on model expertise and research strategies
+
+## Core Architecture (Simplified)
+```
+User Input → Model Teams (A, B, C) → Autonomous Research → Recommendations → Cross-Model Debate → Final Output
+                     ↓
+            Each LLM uses GitHub/Reddit/SO APIs as tools
+```
 
 ---
 
-## **Release v0.1: Foundation MVP** ⚡
-**Timeline**: Sprint 1 (2 weeks)
-**Objective**: Establish core platform foundation with single-model decision engine
+## **Release v0.1: Single Model Foundation** ⚡
+**Timeline**: Week 1-2
+**Objective**: Basic CLI with single model making autonomous research decisions
 
 **Key Features**:
-- CLI interface with argument parsing and validation
-- OpenRouter API integration for single model queries
-- Basic project structure decision support
-- Rich terminal output with structured recommendations
+- CLI interface with argument parsing (`archguru --type project-structure --language python`)
+- Single OpenRouter model (GPT-4o) with research tools
+- LLM autonomously decides what to research on GitHub/Reddit/StackOverflow
+- Basic project structure recommendations
 
 **Technical Deliverables**:
 - Production CLI with `archguru` command
+- OpenRouter API integration
+- LLM tool access to external APIs (GitHub, Reddit, StackOverflow)
 - LangGraph pipeline foundation
-- Error handling and input validation
-- Initial decision context state management
 
 **Success Metrics**:
-- Working CLI generates valid project structure recommendations
-- <30 second response time for basic queries
-- Proper error handling for invalid inputs
+- Working CLI generates researched recommendations
+- LLM successfully uses external APIs as tools
+- <2 minute response time
 
 ---
 
-## **Release v0.2: Multi-Phase Analysis Pipeline** 📊
-**Timeline**: Sprint 2-3 (3 weeks)
-**Objective**: Implement comprehensive three-phase analysis workflow
+## **Release v0.2: Two-Model Competition** 👥
+**Timeline**: Week 3-4
+**Objective**: Add second model team with different research strategies
 
 **Key Features**:
-- Research phase: GitHub repository analysis and documentation scraping
-- Community phase: Reddit, StackOverflow sentiment analysis
-- Generation phase: Synthesis of findings into actionable recommendations
-- Data caching layer for external API optimization
-
-**Technical Deliverables**:
-- External API integration (GitHub, Reddit, StackOverflow)
-- SQLite caching system with TTL management
-- LangGraph state management for multi-phase workflows
-- Rate limiting and retry logic for external services
-
-**Success Metrics**:
-- Incorporates real GitHub data in recommendations
-- Community sentiment influences decision rationale
-- <2 minute response time with caching
-- 95%+ external API success rate
-
----
-
-## **Release v0.3: Model Competition Engine** 👥
-**Timeline**: Sprint 4-5 (3 weeks)
-**Objective**: Launch two-model competition with comparative analysis
-
-**Key Features**:
-- Parallel execution of GPT-4o and Claude-3.5-Sonnet
+- Parallel execution of GPT-4o and Claude-3.5-Sonnet teams
+- Each model autonomously chooses research strategy
 - Side-by-side recommendation comparison
-- Model agreement/disagreement analysis
-- Performance tracking foundation
+- Research approach comparison (what each model chose to investigate)
 
 **Technical Deliverables**:
-- Parallel model execution infrastructure
-- Response comparison and analysis engine
-- Model performance metrics collection
-- Rich CLI output for model comparisons
+- Parallel LangGraph execution for multiple models
+- Model response comparison engine
+- Research strategy tracking and display
+- Rich CLI output showing both recommendations
 
 **Success Metrics**:
-- Both models complete analysis within 3 minutes
-- Clear differentiation in model recommendations
-- User feedback collection mechanism implemented
+- Both models complete research and recommendations <3 minutes
+- Clear differentiation in research approaches
+- Users can see how different research led to different conclusions
 
 ---
 
-## **Release v0.4: Intelligent Model Routing** 🚦
-**Timeline**: Sprint 6 (2 weeks)
-**Objective**: Implement smart model selection based on decision context
+## **Release v0.3: Caching & Performance** 🚀
+**Timeline**: Week 5-6
+**Objective**: Add intelligent caching to optimize repeated queries and API costs
 
 **Key Features**:
-- Decision type analysis and model expertise mapping
-- Dynamic model selection algorithms
-- Context-aware routing logic
-- Model specialization insights
+- SQLite caching for external API responses
+- Model response caching with context awareness
+- Intelligent cache invalidation (time-based and content-based)
+- Performance analytics on cache hit rates
 
 **Technical Deliverables**:
-- Model expertise database and scoring system
-- LangGraph conditional routing implementation
-- Decision context analysis engine
-- Model selection explanation system
-
-**Success Metrics**:
-- Improved recommendation quality through specialized routing
-- Model selection accuracy >80%
-- Reduced API costs through optimal model usage
-
----
-
-## **Release v0.5: Production Data Integration** 🔧
-**Timeline**: Sprint 7-8 (3 weeks)
-**Objective**: Scale data integration with enterprise-grade reliability
-
-**Key Features**:
-- Comprehensive GitHub enterprise repository analysis
-- Multi-platform community sentiment (Reddit, HackerNews, Discord)
-- Technology benchmark and performance data integration
-- Advanced caching strategies with intelligent invalidation
-
-**Technical Deliverables**:
-- Enterprise API integrations with authentication
-- Advanced caching layer with smart invalidation
-- Data quality validation and error recovery
-- Performance monitoring and alerting
-
-**Success Metrics**:
-- 99.5% uptime for data integration services
-- <45 second cached response times
-- Support for 10+ external data sources
-
----
-
-## **Release v0.6: Three-Model Competition Platform** 🏗️
-**Timeline**: Sprint 9-10 (3 weeks)
-**Objective**: Expand to three-model competition with standardized evaluation
-
-**Key Features**:
-- Add Llama-3.1-70B as third competing model
-- Standardized model output evaluation framework
-- Performance scoring and ranking system
-- Model expertise analytics dashboard
-
-**Technical Deliverables**:
-- Scalable N-model execution architecture
-- Model response standardization layer
-- Performance evaluation algorithms
-- Analytics and reporting infrastructure
-
-**Success Metrics**:
-- Three models complete full analysis <4 minutes
-- Consistent model output quality scoring
-- Clear performance differentiation across models
-
----
-
-## **Release v0.7: Cross-Model Debate System** ⚔️
-**Timeline**: Sprint 11-12 (4 weeks)
-**Objective**: Implement model-to-model interaction and debate mechanisms
-
-**Key Features**:
-- Models analyze and critique each other's recommendations
-- Structured debate protocols and argument evaluation
-- Consensus building and conflict resolution algorithms
-- Advanced prompt engineering for model communication
-
-**Technical Deliverables**:
-- Cross-model interaction framework
-- Debate orchestration and conflict resolution
-- Argument quality evaluation system
-- Advanced LangGraph workflow management
-
-**Success Metrics**:
-- Models successfully engage in structured debates
-- Debate outcomes improve recommendation quality
-- User satisfaction with debate-refined recommendations >85%
-
----
-
-## **Release v0.8: Performance Analytics Platform** 📊
-**Timeline**: Sprint 13-14 (3 weeks)
-**Objective**: Launch comprehensive model performance tracking and analytics
-
-**Key Features**:
-- Real-time model performance dashboards
-- User feedback integration and rating systems
-- Model expertise profiling across decision domains
-- Performance trend analysis and insights
-
-**Technical Deliverables**:
-- Analytics dashboard with real-time metrics
-- User feedback collection and processing system
-- Model performance database and reporting
-- API endpoints for analytics integration
-
-**Success Metrics**:
-- Comprehensive performance data across all models
-- User feedback integration >70% response rate
-- Clear model expertise patterns identified
-
----
-
-## **Release v0.9: Universal Decision Types** 🌐
-**Timeline**: Sprint 15-17 (4 weeks)
-**Objective**: Expand beyond project structures to comprehensive architectural decisions
-
-**Key Features**:
-- Database architecture decision support (SQL/NoSQL/Graph)
-- Deployment strategy analysis (Cloud/Container/Serverless)
-- API design recommendations (REST/GraphQL/gRPC)
-- Authentication and security pattern guidance
-
-**Technical Deliverables**:
-- Plugin architecture for decision type extensibility
-- Domain-specific prompt engineering and optimization
-- Cross-domain model performance analysis
-- Decision type configuration management
-
-**Success Metrics**:
-- Support for 5+ major architectural decision categories
-- Consistent quality across all decision types
-- Cross-domain model performance insights
-
----
-
-## **Release v1.0: Enterprise Production Platform** 💾
-**Timeline**: Sprint 18-20 (4 weeks)
-**Objective**: Production-ready platform with enterprise-grade performance
-
-**Key Features**:
-- Advanced caching with distributed architecture
-- Enterprise security and compliance features
-- High-availability deployment infrastructure
-- Professional API documentation and SDK
-
-**Technical Deliverables**:
-- Production deployment infrastructure
-- Enterprise security and authentication
-- Comprehensive API documentation
-- Performance monitoring and alerting
+- SQLite database with caching layer
+- Cache management system with TTL
+- API rate limiting and optimization
+- Performance monitoring
 
 **Success Metrics**:
 - <30 second cached response times
-- 99.9% platform uptime
-- Enterprise security compliance
-- Production API rate limits and quotas
+- >70% cache hit rate for common queries
+- Significant API cost reduction
 
 ---
 
-## **Release v1.1: Advanced User Experience** 🔄
-**Timeline**: Sprint 21-22 (3 weeks)
-**Objective**: Polish user experience with advanced interface and export capabilities
+## **Release v0.4: Third Model & Research Analytics** 🧠
+**Timeline**: Week 7-8
+**Objective**: Add third model team and analytics on research effectiveness
 
 **Key Features**:
-- Enhanced CLI with interactive prompts and wizards
-- Multiple export formats (Markdown, PDF, JSON, YAML)
-- User preference learning and personalization
-- Advanced report generation and templates
+- Add Llama-3.1-70B as third competing model
+- Research strategy analytics (which approaches work best)
+- Model expertise tracking across decision types
+- Research path visualization
 
 **Technical Deliverables**:
-- Interactive CLI interface with Rich components
-- Export engine with multiple format support
-- User preference storage and learning algorithms
-- Template system for report generation
+- Scalable N-model execution architecture
+- Research analytics and tracking system
+- Model performance database
+- Research strategy effectiveness metrics
 
 **Success Metrics**:
-- User experience satisfaction >90%
-- Export functionality usage >60%
-- User retention improvement >25%
+- Three models with distinct research strategies
+- Clear data on which research approaches excel
+- Research strategy recommendations for users
 
 ---
 
-## **Release v1.2: Enterprise Integration Platform** 🧠
-**Timeline**: Sprint 23-25 (4 weeks)
-**Objective**: Enterprise features for team collaboration and cost optimization
+## **Release v0.5: Cross-Model Debate System** ⚔️
+**Timeline**: Week 9-11
+**Objective**: Models critique each other's research and recommendations
 
 **Key Features**:
-- Team workspace and collaboration features
-- Advanced cost optimization and budget management
-- Integration APIs for existing development workflows
-- Enterprise analytics and reporting
+- Models analyze and critique each other's research approaches
+- Structured debate protocols with evidence evaluation
+- Models can challenge each other's findings
+- Consensus building and conflict resolution
 
 **Technical Deliverables**:
-- Multi-tenant architecture with team management
-- Cost optimization algorithms and budget controls
-- Webhook and integration APIs
-- Enterprise reporting and analytics
+- Cross-model interaction framework
+- Debate orchestration with LangGraph
+- Evidence quality evaluation system
+- Argument tracking and synthesis
 
 **Success Metrics**:
-- Team collaboration features adoption >40%
-- Cost optimization reduces API spend >30%
-- Enterprise integration adoption >20%
+- Models successfully engage in evidence-based debates
+- Debate outcomes improve recommendation quality >15%
+- Users see clear value in debate-refined recommendations
 
 ---
 
-## **Release v1.3: Web Platform & API Services** ☁️
-**Timeline**: Sprint 26-28 (4 weeks)
+## **Release v0.6: Universal Decision Types** 🌐
+**Timeline**: Week 12-14
+**Objective**: Expand beyond project structures to all architectural decisions
+
+**Key Features**:
+- Database architecture decisions (SQL/NoSQL/Graph/Vector)
+- Deployment strategy analysis (Cloud/Container/Serverless/Edge)
+- API design recommendations (REST/GraphQL/gRPC/WebSocket)
+- Security architecture patterns and authentication strategies
+
+**Technical Deliverables**:
+- Decision type plugin architecture
+- Domain-specific research strategies
+- Cross-domain model performance analysis
+- Context-aware decision type detection
+
+**Success Metrics**:
+- Support for 5+ major architectural decision categories
+- Models adapt research strategies to decision type
+- Consistent quality across all decision domains
+
+---
+
+## **Release v0.7: Extended Research Capabilities** 🔬
+**Timeline**: Week 15-17
+**Objective**: Enhanced research tools and data sources
+
+**Key Features**:
+- Documentation and benchmarking data integration
+- Code repository analysis and pattern recognition
+- Technology trend analysis and adoption metrics
+- Performance benchmarking data integration
+
+**Technical Deliverables**:
+- Extended API integrations (HackerNews, ArXiv, tech blogs)
+- Code analysis tools for repository insights
+- Benchmarking data aggregation
+- Trend analysis algorithms
+
+**Success Metrics**:
+- Models use 10+ diverse data sources in research
+- Research includes quantitative performance data
+- Technology adoption trends influence recommendations
+
+---
+
+## **Release v0.8: Web Platform & API** ☁️
+**Timeline**: Week 18-20
 **Objective**: Launch web application with full API platform
 
 **Key Features**:
-- Full-featured web application with dashboard
-- RESTful API with comprehensive documentation
-- Real-time collaboration and sharing features
-- Mobile-responsive design and PWA capabilities
+- Full-featured web dashboard showing research paths
+- RESTful API with documentation
+- Real-time research process visualization
+- Shareable reports with research methodology
 
 **Technical Deliverables**:
 - React-based web application
 - FastAPI backend with OpenAPI documentation
-- Real-time WebSocket communication
-- Progressive Web App implementation
+- Real-time WebSocket for research progress
+- Report generation and sharing system
 
 **Success Metrics**:
-- Web platform user adoption >1000 users
-- API usage >10,000 requests/month
-- Mobile experience satisfaction >85%
+- Web platform adoption >500 users
+- API usage >5,000 requests/month
+- Users share research reports >30% of sessions
 
 ---
 
-## **Release v1.4: AI Intelligence Platform** 🔬
-**Timeline**: Sprint 29-32 (6 weeks)
-**Objective**: Advanced AI analytics and continuous learning platform
+## **Release v0.9: Enterprise Features** 🏢
+**Timeline**: Week 21-23
+**Objective**: Enterprise features for teams and organizations
 
 **Key Features**:
-- Model personality profiling and expertise mapping
-- Continuous learning from user feedback and outcomes
-- Predictive analytics for architectural decision trends
-- Advanced AI model fine-tuning capabilities
+- Team workspaces with shared research history
+- Custom model configurations and research preferences
+- Enterprise API integrations and SSO
+- Analytics and reporting dashboards
 
 **Technical Deliverables**:
-- AI model analytics and profiling system
-- Continuous learning pipeline
-- Predictive analytics engine
-- Model fine-tuning infrastructure
+- Multi-tenant architecture
+- Enterprise authentication and authorization
+- Custom model configuration management
+- Enterprise reporting and analytics
 
 **Success Metrics**:
-- Model expertise profiles show clear differentiation
-- Recommendation quality improves >15% through learning
-- Predictive accuracy for decision trends >75%
+- >20 enterprise teams using platform
+- Team collaboration features adoption >60%
+- Enterprise security compliance achieved
+
+---
+
+## **Release v1.0: AI Research Intelligence** 🧬
+**Timeline**: Week 24-26
+**Objective**: AI capabilities and continuous learning
+
+**Key Features**:
+- Model research strategy optimization through reinforcement learning
+- Predictive analytics for architectural decision trends
+- Research quality scoring and improvement suggestions
+- Automated research methodology refinement
+
+**Technical Deliverables**:
+- Reinforcement learning for research optimization
+- Predictive analytics engine
+- Research quality evaluation system
+- Automated methodology improvement
+
+**Success Metrics**:
+- Research quality improves >25% through learning
+- Predictive accuracy for tech trends >80%
+- Models develop specialized research expertise
 
 ---
 
 ## Success Metrics & KPIs
 
-### Platform Adoption
-- **User Growth**: 10,000+ registered users by v1.3
-- **Decision Volume**: 100,000+ architectural decisions analyzed
-- **Enterprise Adoption**: 100+ enterprise teams using platform
+### Platform Performance
+- **Response Time**: <30s cached, <3min fresh research
+- **Research Quality**: Models find relevant, current information >90%
+- **User Satisfaction**: >90% find research-backed recommendations helpful
 
-### Quality & Performance
-- **Response Time**: <30s cached, <3min fresh analysis
-- **Uptime**: 99.9% platform availability
-- **User Satisfaction**: >90% positive feedback
-
-### Model Performance
-- **Accuracy**: Model recommendations validated as helpful >85%
-- **Differentiation**: Clear model expertise patterns across decision types
-- **Cost Efficiency**: Optimal model selection reduces API costs >30%
+### Model Competition
+- **Research Differentiation**: Clear differences in model research strategies
+- **Debate Quality**: Models provide evidence-based critiques and improvements
+- **Expertise Development**: Models develop specialized knowledge domains
 
 ### Business Impact
-- **Market Position**: Leading AI architecture decision platform
-- **Revenue Potential**: Subscription and enterprise licensing model
-- **Industry Recognition**: Conference talks, case studies, analyst coverage
+- **User Growth**: 5,000+ active users by v1.0
+- **Decision Volume**: 50,000+ researched architectural decisions
+- **Market Position**: AI architecture decision platform with autonomous research
 
-## Technology Evolution
+## Technology Stack
 
-### Infrastructure Scaling
-- **Q1**: Single-server deployment with SQLite
-- **Q2**: Distributed caching with Redis/PostgreSQL
-- **Q3**: Microservices architecture with Kubernetes
-- **Q4**: Multi-region deployment with CDN
+- **Python 3.13** with uv package manager
+- **LangGraph** for model orchestration and tool usage
+- **OpenRouter** for multi-model access with tool capabilities
+- **SQLite** for caching and analytics (→ PostgreSQL for scale)
+- **External APIs** as LLM tools: GitHub, Reddit, StackOverflow, HackerNews
+- **Rich/Typer** for CLI interface
+- **FastAPI** for web platform and API endpoints
 
-### AI Model Evolution
-- **Phase 1**: OpenRouter model integration (GPT, Claude, Llama)
-- **Phase 2**: Custom model fine-tuning for architectural domains
-- **Phase 3**: Proprietary model training on architectural decision data
-- **Phase 4**: Advanced multi-modal AI for diagram and code analysis
+## Key Innovation: LLM-Driven Research
 
-## Risk Management
+Unlike traditional systems that pre-define research pipelines, ArchGuru lets each LLM model:
+- **Autonomously decide** what research is needed for each decision
+- **Choose research strategies** that align with their reasoning approach
+- **Adapt research depth** based on decision complexity
+- **Develop expertise** in specific research methodologies
+- **Critique and improve** each other's research approaches
 
-### Technical Risks
-- **API Rate Limits**: Multi-provider strategy and intelligent caching
-- **Model Availability**: Graceful degradation and fallback models
-- **Performance Scaling**: Cloud-native architecture from day one
-
-### Market Risks
-- **Competition**: First-mover advantage and continuous innovation
-- **AI Model Changes**: Provider-agnostic architecture
-- **User Adoption**: Strong value proposition and user experience focus
+This creates a self-improving system where models compete not just on reasoning, but on research strategy and information synthesis.
 
 ---
-
-**This roadmap represents a strategic 8-month development plan to establish ArchGuru as the definitive AI-powered architecture decision platform.**

@@ -10,7 +10,7 @@
 
 ## What is ArchGuru?
 
-ArchGuru is a revolutionary CLI platform that uses **competing AI model teams** to provide expert architectural guidance for any technical decision. Instead of relying on a single AI model, ArchGuru pits multiple AI teams against each other to give you the most comprehensive and reliable architectural recommendations.
+ArchGuru is a CLI platform that uses **competing AI model teams** to provide architectural guidance for any technical decision. Instead of relying on a single AI model, ArchGuru pits multiple AI teams against each other to give you multiple perspectives and reliable architectural recommendations.
 
 ### The Problem We Solve
 
@@ -50,7 +50,7 @@ archguru --type api --pattern "microservices" --auth "oauth2"
 
 ### 🔄 Three-Phase Analysis Pipeline
 
-Each model team runs a comprehensive analysis:
+Each model team runs an analysis:
 
 1. **Research Phase**: Analyzes GitHub repos, documentation, benchmarks
 2. **Community Phase**: Evaluates Reddit discussions, StackOverflow trends, developer sentiment
@@ -85,7 +85,7 @@ Get perspectives from multiple AI models, not just one. Compare recommendations 
 
 ### ⚔️ **Cross-Model Debates**
 
-Models analyze and critique each other's recommendations, leading to more refined and thoughtful advice.
+Models analyze and critique each other's recommendations, leading to refined and thoughtful advice.
 
 ### 🔄 **Performance Analytics**
 
