@@ -22,7 +22,7 @@ class DecisionRequest:
 
 @dataclass
 class ModelResponse:
-    """Response from a single model"""
+    """Response from a single model with research tracking"""
     model_name: str
     team: str  # openai, claude, llama
     recommendation: str
@@ -30,11 +30,14 @@ class ModelResponse:
     trade_offs: List[str]
     confidence_score: float
     response_time: float
+    research_steps: List[Dict[str, Any]] = None
     timestamp: datetime = None
 
     def __post_init__(self):
         if self.timestamp is None:
             self.timestamp = datetime.now()
+        if self.research_steps is None:
+            self.research_steps = []
 
 
 @dataclass

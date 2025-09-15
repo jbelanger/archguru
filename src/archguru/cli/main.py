@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
 ArchGuru CLI - Universal AI Architecture Decision Platform
-Chapter 1 MVP: Basic CLI with model competition foundation
+v0.1: Single model with autonomous research
 """
 import argparse
 import asyncio
 import sys
 
 from ..models.decision import DecisionRequest
-from ..agents.pipeline import ModelCompetitionPipeline
+from ..agents.pipeline import ModelResearchPipeline
 from ..core.config import Config
 
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="archguru",
-        description="Universal AI Architecture Decision Platform - Get architectural guidance from competing AI models"
+        description="Universal AI Architecture Decision Platform - Get architectural guidance with autonomous AI research"
     )
 
     parser.add_argument(
@@ -51,7 +51,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 async def run_decision(args) -> int:
     """Run the architectural decision process"""
-    print("🏗️  ArchGuru v0.1 - Universal AI Architecture Decision Platform")
+    print("🏗️  ArchGuru v0.1 - AI Architecture Research Platform")
     print("=" * 60)
 
     print(f"Decision Type: {args.type}")
@@ -74,22 +74,25 @@ async def run_decision(args) -> int:
     )
 
     try:
-        pipeline = ModelCompetitionPipeline()
+        pipeline = ModelResearchPipeline()
         result = await pipeline.run(request)
 
-        print(f"\n🏆 Competition Results:")
-        print(f"Winning Model: {result.winning_model or 'No clear winner'}")
-        print(f"Number of responses: {len(result.model_responses)}")
+        print(f"\n🔬 Research Results:")
+        if result.model_responses:
+            response = result.model_responses[0]
+            print(f"Model: {response.model_name}")
+            print(f"Research steps: {len(response.research_steps)}")
+            print(f"Response time: {response.response_time:.2f}s")
 
-        print(f"\n📋 Consensus Recommendation:")
-        print(result.consensus_recommendation or "No consensus reached")
+        print(f"\n📋 Recommendation:")
+        print(result.consensus_recommendation or "No recommendation generated")
 
-        if args.verbose:
-            print(f"\n📊 Detailed Results:")
-            for response in result.model_responses:
-                print(f"\n{response.team.upper()} Team ({response.model_name}):")
-                print(f"  Response time: {response.response_time:.2f}s")
-                print(f"  Recommendation: {response.recommendation[:100]}...")
+        if args.verbose and result.model_responses:
+            response = result.model_responses[0]
+            print(f"\n📊 Research Details:")
+            for i, step in enumerate(response.research_steps, 1):
+                print(f"  {i}. {step['function']}")
+            print(f"\nReasoning: {response.reasoning}")
 
         return 0
 

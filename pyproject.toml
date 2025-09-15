@@ -13,4 +13,4 @@ dependencies = [
 ]
 
 [project.scripts]
-archguru = "archguru.cli.main:main"
+archguru = "src.archguru.cli.main:main"
