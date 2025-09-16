@@ -153,7 +153,7 @@ SELECTION REASONING:
 
 CONSENSUS RECOMMENDATION:
 Start with: "Final Recommendation: <one concise sentence>"
-Then provide 3–6 reasoning bullets, trade-offs, and 3–7 implementation steps.
+Then provide 3-6 reasoning bullets, trade-offs, and 3-7 implementation steps.
 Include a short "Evidence:" bullet list if you referenced any repos.
 
 SUMMARY:

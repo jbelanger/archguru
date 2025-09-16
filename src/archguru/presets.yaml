@@ -1,0 +1,51 @@
+# ArchGuru Model Presets Configuration
+# Per ADR-001: Minimal presets per decision type
+
+orchestration:
+  default_teams: 2
+  max_teams: 4
+  escalation_triggers:
+    min_agreement_kendall_tau: 0.3
+    min_self_confidence: 0.6
+    cache_miss: true
+  arbiter_model_env: ARCHGURU_ARBITER_MODEL
+
+presets:
+  project-structure:
+    defaults: ["openai/gpt-4o-mini", "anthropic/claude-3-haiku"]
+    research_depth: medium
+    cost_ceiling_usd: 0.20
+
+  database:
+    defaults: ["openai/gpt-4o", "anthropic/claude-3.5-sonnet"]
+    research_depth: high
+    cost_ceiling_usd: 0.40
+
+  deployment:
+    defaults: ["anthropic/claude-3.5-sonnet", "meta-llama/llama-3.1-70b-instruct"]
+    research_depth: high
+    cost_ceiling_usd: 0.35
+
+  api-design:
+    defaults: ["anthropic/claude-3.5-sonnet", "meta-llama/llama-3.1-70b-instruct"]
+    research_depth: medium
+    cost_ceiling_usd: 0.25
+
+# Cost tracking configuration
+cost_tracking:
+  # Cost per 1k tokens for different model tiers (approximate)
+  model_costs:
+    "openai/gpt-4o": 0.005
+    "openai/gpt-4o-mini": 0.0002
+    "anthropic/claude-3.5-sonnet": 0.003
+    "anthropic/claude-3-haiku": 0.0005
+    "meta-llama/llama-3.1-70b-instruct": 0.0008
+    "google/gemini-pro-1.5": 0.002
+    "x-ai/grok-beta": 0.005
+    "deepseek/deepseek-chat": 0.0002
+
+  # Default cost ceiling if not specified in preset
+  default_ceiling_usd: 0.30
+
+  # Warning threshold (percentage of ceiling)
+  warning_threshold: 0.80

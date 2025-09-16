@@ -3,7 +3,9 @@ Configuration management for ArchGuru
 Handles OpenRouter API keys and model settings
 """
 import os
-from typing import List
+import yaml
+from pathlib import Path
+from typing import List, Dict, Optional
 from dotenv import load_dotenv
 
 load_dotenv()
